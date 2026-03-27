@@ -1,0 +1,18 @@
+# Local dev config — contains real API keys, never commit
+config.local.js
+API keys.txt
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auckland Live</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/deck.gl@9/dist.min.js"></script>
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Weather HUD — top-left -->
+  <div id="weather-hud" class="hud">
+    <div id="hud-temp">--°C</div>
+    <div id="hud-desc">Loading…</div>
+    <div id="hud-wind">Wind: --</div>
+    <div id="hud-humidity">Humidity: --%</div>
+  </div>
+
+  <!-- Layer Controls — top-right -->
+  <div id="controls" class="controls-panel">
+    <div class="control-row">
+      <label>
+        <input type="checkbox" id="toggle-transport" checked>
+        Transport <span id="count-transport" class="count">--</span>
+      </label>
+    </div>
+    <div class="control-row">
+      <label>
+        <input type="checkbox" id="toggle-aircraft" checked>
+        Flights <span id="count-aircraft" class="count">--</span>
+      </label>
+    </div>
+    <div class="control-row">
+      <label>
+        <input type="checkbox" id="toggle-weather" checked>
+        Weather
+      </label>
+    </div>
+  </div>
+
+  <!-- Detail panel — slides up from bottom on entity click -->
+  <div id="detail-panel" class="detail-panel">
+    <button id="detail-panel-close" aria-label="Close">✕</button>
+    <div id="detail-panel-body"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
