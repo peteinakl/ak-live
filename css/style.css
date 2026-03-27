@@ -77,6 +77,38 @@ html, body {
   margin-bottom: 0;
 }
 
+.control-divider {
+  height: 1px;
+  background: rgba(80, 160, 220, 0.2);
+  margin: 8px 0;
+}
+
+.basemap-row { gap: 6px; }
+
+.basemap-btn {
+  flex: 1;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid rgba(80, 160, 220, 0.3);
+  border-radius: 4px;
+  color: #607080;
+  font-family: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.basemap-btn:hover {
+  border-color: rgba(127, 216, 255, 0.5);
+  color: #a0b8c8;
+}
+
+.basemap-btn.active {
+  background: rgba(127, 216, 255, 0.15);
+  border-color: rgba(127, 216, 255, 0.6);
+  color: #7fd8ff;
+}
+
 .control-row label {
   display: flex;
   align-items: center;

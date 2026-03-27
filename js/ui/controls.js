@@ -12,6 +12,21 @@ export function initControls({ onTransportToggle, onAircraftToggle, onWeatherTog
   });
 }
 
+export function initBasemapToggle(onBasemapChange) {
+  const btnStreets = document.getElementById('basemap-streets');
+  const btnAerial  = document.getElementById('basemap-aerial');
+
+  function setActive(basemap) {
+    btnStreets.classList.toggle('active', basemap === 'streets');
+    btnAerial.classList.toggle('active',  basemap === 'aerial');
+  }
+
+  btnStreets.addEventListener('click', () => { setActive('streets'); onBasemapChange('streets'); });
+  btnAerial.addEventListener('click',  () => { setActive('aerial');  onBasemapChange('aerial'); });
+
+  setActive('streets');
+}
+
 export function updateCounts({ transport, aircraft }) {
   document.getElementById('count-transport').textContent = transport;
   document.getElementById('count-aircraft').textContent = aircraft;

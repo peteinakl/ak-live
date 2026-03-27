@@ -2,10 +2,42 @@
 // Initialises MapLibre GL and attaches deck.gl MapboxOverlay.
 // Depends on window.maplibregl and window.deck (UMD globals from index.html).
 
+export function buildStreetsStyle(maptilerKey) {
+  return `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`;
+}
+
+export function buildAerialStyle(linzKey) {
+  return {
+    version: 8,
+    sources: {
+      'linz-aerial': {
+        type: 'raster',
+        tiles: [`https://basemaps.linz.govt.nz/v1/tiles/aerial/WebMercatorQuad/{z}/{x}/{y}.webp?api=${linzKey}`],
+        tileSize: 256,
+        maxzoom: 20,
+        attribution: '© <a href="https://www.linz.govt.nz" target="_blank">LINZ</a> CC BY 4.0',
+      },
+    },
+    layers: [{ id: 'linz-aerial-layer', type: 'raster', source: 'linz-aerial' }],
+  };
+}
+
+// streets-v2 includes a hillshade layer whose tile source has a maxzoom cap.
+// At pitch 50° the near-ground horizon requests tiles beyond that cap, producing
+// "Zoom Level Not Supported" images. Remove those layers after each style load.
+// Filter is hillshade/raster-dem only — NOT generic 'raster' — so the LINZ
+// aerial layer is never accidentally removed.
+export function removeHillshadeLayers(map) {
+  const toRemove = map.getStyle().layers
+    .filter(l => l.type === 'hillshade' || l.type === 'raster-dem')
+    .map(l => l.id);
+  toRemove.forEach(id => { try { map.removeLayer(id); } catch {} });
+}
+
 export function initMap(maptilerKey, onLayerClick) {
   const map = new maplibregl.Map({
     container: 'map',
-    style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`,
+    style: buildStreetsStyle(maptilerKey),
     center: [174.7570, -36.8438],  // [lng, lat] — Victoria Park Market
     zoom: 12,
     pitch: 50,
@@ -21,19 +53,6 @@ export function initMap(maptilerKey, onLayerClick) {
   });
 
   map.addControl(overlay);
-
-  // streets-v2 includes a hillshade raster layer whose tile source has a
-  // maxzoom cap. With pitch 50° the near-ground horizon requests tiles beyond
-  // that cap, producing "Zoom Level Not Supported" tile images. Remove any
-  // hillshade/raster-dem layers once the style loads to prevent this.
-  map.on('load', () => {
-    const toRemove = map.getStyle().layers
-      .filter(l => l.type === 'hillshade' || l.type === 'raster')
-      .map(l => l.id);
-    toRemove.forEach(id => {
-      try { map.removeLayer(id); } catch {}
-    });
-  });
 
   return { map, overlay };
 }

@@ -33,6 +33,7 @@ export const CONFIG = {
   AT_API_KEY: '...',             // dev-portal.at.govt.nz — free
   OPENSKY_CLIENT_ID: '...',      // opensky-network.org — free account
   OPENSKY_CLIENT_SECRET: '...',
+  LINZ_API_KEY: '...',           // basemaps.linz.govt.nz — free
 };
 ```
 
@@ -45,6 +46,7 @@ export const CONFIG = {
 | MapTiler | [cloud.maptiler.com](https://cloud.maptiler.com) | Free (100k req/month) |
 | Auckland Transport | [dev-portal.at.govt.nz](https://dev-portal.at.govt.nz) | Free |
 | OpenSky Network | [opensky-network.org](https://opensky-network.org) | Free (4k credits/day authenticated) |
+| LINZ Basemaps | [basemaps.linz.govt.nz](https://basemaps.linz.govt.nz) | Free |
 | Open-Meteo | — | No key needed |
 
 ## Architecture
@@ -63,7 +65,7 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 ## Stack
 
-- **[MapLibre GL JS v4](https://maplibre.org/)** — vector basemap (MapTiler streets-v2)
+- **[MapLibre GL JS v4](https://maplibre.org/)** — vector basemap (MapTiler streets-v2) or LINZ aerial imagery
 - **[deck.gl v9](https://deck.gl/)** — WebGL overlay for transport/aircraft layers
 - **[RainViewer](https://www.rainviewer.com/api.html)** — rain radar tile (free, no key)
 - **[Open-Meteo](https://open-meteo.com/)** — weather conditions (free, no key)
@@ -80,17 +82,20 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 ## What's built
 
-- Live transport dots (blue=bus, orange=train, teal=ferry) with 60s trails
-- Aircraft dots coloured by altitude (white→amber→green on ground)
+- Live transport dots (blue=bus, orange=train, teal=ferry) with 2-min fading trails
+- Aircraft dots coloured by altitude (orange shades → green on ground)
 - Click any vehicle or aircraft for detail panel
 - Rain radar overlay (semi-transparent over the map)
 - Weather HUD: temperature, conditions, wind, humidity
 - Layer toggles
+- Streets / Aerial basemap toggle (LINZ high-resolution orthophoto)
+
+## Known data quality issues
+
+- **AT speed data**: AT's GTFS-RT feed sometimes reports speed as the raw GPS Doppler value, which can spike to 80–100 m/s (~300 km/h) momentarily, especially as a bus pulls away from a stop. Speeds above 140 km/h are capped and shown as n/a.
 
 ## What's not built yet
 
-- Arrow/plane icons oriented by bearing (currently plain dots)
 - 24h forecast strip
-- Stale vehicle fade (>2 min old)
 - Cloudflare Worker + Pages deployment
 - Mobile responsive layout

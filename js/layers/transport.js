@@ -47,7 +47,7 @@ export async function fetchTransportData() {
       id:        entity.id,
       position:  [v.position.longitude, v.position.latitude],
       bearing:   v.position.bearing ?? 0,
-      speed:     v.position.speed ?? null,    // m/s
+      speed:     (v.position.speed != null && v.position.speed <= 38.9) ? v.position.speed : null,  // m/s, capped at 140 km/h
       routeId:   rawRouteId,
       routeLabel: routeLabel(rawRouteId),     // display label e.g. "209"
       vehicleLabel: label,                    // e.g. "Korora" for ferries
@@ -60,17 +60,26 @@ export async function fetchTransportData() {
   return vehicles;
 }
 
+const TRAIL_FADE_MS = 120_000; // 2 min — segments older than this are invisible
+
 export function buildTransportTrailLayer(trails, visible) {
-  const paths = [];
+  const now = Date.now();
+  const segments = [];
   for (const history of trails.values()) {
     if (history.length < 2) continue;
     const routeId = history[history.length - 1].routeId ?? '';
     const [r, g, b] = ROUTE_COLOR[classifyRoute(routeId)];
-    paths.push({ path: history.map(h => h.position), color: [r, g, b, 180] });
+    for (let i = 0; i < history.length - 1; i++) {
+      const ageMs = now - (history[i].ts ?? now);
+      if (ageMs >= TRAIL_FADE_MS) continue;            // fully expired, skip
+      const t = 1 - ageMs / TRAIL_FADE_MS;             // 1 = fresh, 0 = 2 min old
+      const alpha = Math.round(t * 200);
+      segments.push({ path: [history[i].position, history[i + 1].position], color: [r, g, b, alpha] });
+    }
   }
   return new deck.PathLayer({
     id: 'transport-trail-layer',
-    data: paths,
+    data: segments,
     visible,
     pickable: false,
     widthMinPixels: 1,

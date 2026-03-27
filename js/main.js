@@ -1,6 +1,8 @@
 // js/main.js — App orchestrator
 import { loadConfig }                                        from './utils/config.js';
-import { initMap, setLayers }                                from './map-init.js';
+import { initMap, setLayers,
+         buildStreetsStyle, buildAerialStyle,
+         removeHillshadeLayers }                             from './map-init.js';
 import { fetchTransportData,
          buildTransportLayer,
          buildTransportTrailLayer }                          from './layers/transport.js';
@@ -9,7 +11,8 @@ import { fetchAircraftData,
          buildAircraftTrailLayer }                           from './layers/aircraft.js';
 import { fetchWeatherData, updateWeatherHUD,
          fetchRadarInfo, buildRadarLayer }                   from './layers/weather.js';
-import { initControls, updateCounts }                        from './ui/controls.js';
+import { initControls, updateCounts,
+         initBasemapToggle }                                 from './ui/controls.js';
 import { setWeatherHudVisible }                              from './ui/hud.js';
 import { showTransportDetail, showAircraftDetail,
          hidePanel }                                         from './ui/detail-panel.js';
@@ -24,9 +27,13 @@ const state = {
   visible: { transport: true, aircraft: true, weather: true },
 };
 
-const MAX_TRAIL_POINTS = 6;
+const MAX_TRAIL_POINTS = 15; // 15 × 10 s = 2.5 min — time-based fading handles visual cutoff
 
-let overlay = null;
+let overlay        = null;
+let currentBasemap = 'streets';
+let _appStarted    = false;
+let _maptilerKey   = null;
+let _linzKey       = null;
 
 // --- Trail history update ---
 // Each function only updates its own trail map to avoid double-appending
@@ -35,7 +42,7 @@ function updateVehicleTrails(vehicles) {
   const seen = new Set(vehicles.map(v => v.id));
   for (const v of vehicles) {
     const hist = state.vehicleTrails.get(v.id) ?? [];
-    hist.push({ position: v.position, routeId: v.routeId });
+    hist.push({ position: v.position, routeId: v.routeId, ts: Date.now() });
     if (hist.length > MAX_TRAIL_POINTS) hist.shift();
     state.vehicleTrails.set(v.id, hist);
   }
@@ -126,6 +133,9 @@ function startPolling() {
 // --- Init ---
 async function init() {
   const config = await loadConfig();
+  _maptilerKey = config.MAPTILER_KEY;
+  _linzKey     = config.LINZ_API_KEY;
+
   const { map, overlay: deckOverlay } = initMap(config.MAPTILER_KEY, onLayerClick);
   overlay = deckOverlay;
 
@@ -135,9 +145,21 @@ async function init() {
     onWeatherToggle:   v => { state.visible.weather   = v; setWeatherHudVisible(v); rebuildLayers(); },
   });
 
-  map.on('load', async () => {
-    state.radarInfo = await fetchRadarInfo();
-    startPolling();
+  function onBasemapChange(basemap) {
+    if (basemap === currentBasemap) return;
+    currentBasemap = basemap;
+    map.setStyle(basemap === 'aerial' ? buildAerialStyle(_linzKey) : buildStreetsStyle(_maptilerKey));
+  }
+
+  initBasemapToggle(onBasemapChange);
+
+  map.on('style.load', async () => {
+    if (currentBasemap === 'streets') removeHillshadeLayers(map);
+    if (!_appStarted) {
+      _appStarted = true;
+      state.radarInfo = await fetchRadarInfo();
+      startPolling();
+    }
   });
 }
 
