@@ -56,11 +56,13 @@ export const CONFIG = {
 ```
 Browser (MapLibre + deck.gl)
   ↓
-proxy.js :3001          ← local dev only
+proxy.js :3001              ← local dev only
   ├── /at/*      → api.at.govt.nz          (injects AT key)
   └── /opensky/* → opensky-network.org     (OAuth2 client credentials)
 
-Open-Meteo → direct from browser (no auth)
+Open-Meteo  → direct from browser (no auth)
+LINZ        → direct from browser (key in tile URL, domain-safe)
+TomTom      → direct from browser (key in tile URL, domain-safe)
 ```
 
 The proxy is only needed locally. In production this is replaced by a Cloudflare Worker.
@@ -69,18 +71,21 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 - **[MapLibre GL JS v4](https://maplibre.org/)** — vector basemap (MapTiler streets-v2) or LINZ aerial imagery
 - **[deck.gl v9](https://deck.gl/)** — WebGL overlay for transport/aircraft layers
+- **[TomTom Traffic API](https://developer.tomtom.com/traffic-api/documentation/traffic-flow/raster-flow-tiles)** — real-time flow tiles (MapLibre raster layer)
 - **[RainViewer](https://www.rainviewer.com/api.html)** — rain radar tile (free, no key)
 - **[Open-Meteo](https://open-meteo.com/)** — weather conditions (free, no key)
 - Vanilla JS ES modules, no build step
 
 ## Data layers
 
-| Layer | Source | Refresh |
-|-------|--------|---------|
-| Public transport | Auckland Transport GTFS-RT | 10s |
-| Aircraft | OpenSky Network ADS-B | 10s |
-| Rain radar | RainViewer | On load |
-| Weather HUD | Open-Meteo | 5 min |
+| Layer | Source | Refresh | Routing |
+|-------|--------|---------|---------|
+| Public transport | Auckland Transport GTFS-RT | 10s | Via proxy |
+| Aircraft | OpenSky Network ADS-B | 10s | Via proxy |
+| Traffic flow | TomTom raster tiles | Live (tile cache) | Direct |
+| Rain radar | RainViewer | On load | Direct |
+| Weather HUD | Open-Meteo | 5 min | Direct |
+| Aerial imagery | LINZ Basemaps | Static | Direct |
 
 ## What's built
 
