@@ -106,7 +106,9 @@ export async function fetchRadarInfo() {
     const latest = frames[frames.length - 1];
     const host = data.host ?? 'https://tilecache.rainviewer.com';
     return {
-      tileUrlTemplate: `${host}${latest.path}/256/{z}/{x}/{y}/2/1_1.png`,
+      // Color scheme 6 = RAINBOW@SELEX-SI — smoother intensity gradients
+      // smooth=1 applies server-side interpolation; snow=0 (not relevant for NZ)
+      tileUrlTemplate: `${host}${latest.path}/256/{z}/{x}/{y}/6/1_0.png`,
       ts: latest.time,
     };
   } catch (err) {
@@ -130,6 +132,11 @@ export function buildRadarLayer(radarInfo, visible) {
         data: null,
         image: props.data,
         bounds: [west, south, east, north],
+        // Linear filtering smooths the blocky radar pixel edges
+        textureParameters: {
+          minFilter: 'linear',
+          magFilter: 'linear',
+        },
       });
     },
   });
