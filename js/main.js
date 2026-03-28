@@ -145,13 +145,13 @@ async function init() {
     onTransportToggle: v => { state.visible.transport = v; rebuildLayers(); },
     onAircraftToggle:  v => { state.visible.aircraft  = v; rebuildLayers(); },
     onWeatherToggle:   v => { state.visible.weather   = v; setWeatherHudVisible(v); rebuildLayers(); },
-    onTrafficToggle:   v => { state.visible.traffic   = v; map.setLayoutProperty('tomtom-traffic-flow', 'visibility', v ? 'visible' : 'none'); },
+    onTrafficToggle:   v => { state.visible.traffic   = v; try { map.setLayoutProperty('tomtom-traffic-flow', 'visibility', v ? 'visible' : 'none'); } catch {} },
   });
 
   function onBasemapChange(basemap) {
     if (basemap === currentBasemap) return;
     currentBasemap = basemap;
-    map.setStyle(basemap === 'aerial' ? buildAerialStyle(_linzKey) : buildStreetsStyle(_maptilerKey));
+    map.setStyle(basemap === 'aerial' ? buildAerialStyle(_linzKey) : buildStreetsStyle(_maptilerKey), { diff: false });
   }
 
   initBasemapToggle(onBasemapChange);
