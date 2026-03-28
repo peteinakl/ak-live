@@ -37,7 +37,7 @@ Open `http://localhost:3000`. Config requires `config.local.js` (gitignored — 
 | Public transport | AT GTFS-RT API | 10s | Via proxy → deck.gl ScatterplotLayer |
 | Aircraft | OpenSky ADS-B | 10s | Via proxy → deck.gl ScatterplotLayer |
 | Traffic flow | TomTom raster tiles | Live | Direct → MapLibre raster layer |
-| Rain radar | RainViewer | On load | Direct → deck.gl BitmapLayer |
+| Rain radar | RainViewer | 10 min | Direct → deck.gl TileLayer + BitmapLayer |
 | Weather HUD | Open-Meteo | 5 min | Direct → DOM |
 | Aerial imagery | LINZ Basemaps | Static | Direct → MapLibre style |
 
@@ -54,6 +54,8 @@ Open `http://localhost:3000`. Config requires `config.local.js` (gitignored — 
 **AT speed cap:** `position.speed` is capped at 38.9 m/s (140 km/h) — AT's feed sometimes sends GPS Doppler spikes of 80–100 m/s.
 
 **Map bounds:** `maxBounds` restricts panning to the NZ North Island (172.5–178.6°E, 41.7–34.3°S). `minZoom: 7` prevents zooming out to South Island. All live data is Auckland-only.
+
+**Rain radar:** Uses `TileLayer` with `maxZoom: 6` (RainViewer's radar data resolution cap) and `renderSubLayers` returning a `BitmapLayer` per tile. `textureParameters: { minFilter: 'linear', magFilter: 'linear' }` on the BitmapLayer applies bilinear interpolation to smooth pixel edges. Colour scheme 6 (RAINBOW@SELEX-SI), smooth=1, snow=0. `fetchRadarInfo()` is called on init and every 10 min via `refreshRadar()`. Note: fog/cloud are not visible on rain radar — only precipitation shows.
 
 **Liquid glass UI:** All panels use `backdrop-filter: blur(48px) saturate(180%) brightness(1.06)` with low-opacity backgrounds so map colours bleed through. A `::before` pseudo-element adds a refraction gradient. The detail panel uses the same recipe at `blur(56px)`. Do not replace with opaque backgrounds.
 

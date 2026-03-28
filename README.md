@@ -83,7 +83,7 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 | Public transport | Auckland Transport GTFS-RT | 10s | Via proxy |
 | Aircraft | OpenSky Network ADS-B | 10s | Via proxy |
 | Traffic flow | TomTom raster tiles | Live (tile cache) | Direct |
-| Rain radar | RainViewer | On load | Direct |
+| Rain radar | RainViewer | 10 min | Direct |
 | Weather HUD | Open-Meteo | 5 min | Direct |
 | Aerial imagery | LINZ Basemaps | Static | Direct |
 
@@ -93,7 +93,7 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 - Aircraft dots coloured by altitude (orange shades → green on ground)
 - Click any vehicle or aircraft for a glass detail panel
 - 24h hourly forecast strip (temperature, conditions, rain probability)
-- Rain radar overlay (semi-transparent over the map)
+- Rain radar overlay (RainViewer, refreshes every 10 min, linear-filtered for smooth rendering)
 - Weather HUD: temperature, conditions, wind, humidity
 - Layer toggles (transport, flights, weather, traffic)
 - Streets / Aerial basemap toggle (LINZ high-resolution orthophoto)
