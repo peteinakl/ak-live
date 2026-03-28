@@ -138,6 +138,7 @@ function _renderHUD(entity, type) {
     metaEl.textContent    = `${speedKmh} · ${bearing}`;
     badgeEl.textContent   = vtype.toUpperCase();
     badgeEl.dataset.vtype = vtype;
+    infoBtn.hidden        = false;
 
     const rows = [];
     if (entity.routeLabel)   rows.push(_row('Route',      entity.routeLabel));
@@ -167,6 +168,10 @@ function _renderHUD(entity, type) {
       ? `On ground · ${heading}`
       : `${altM} m · ${speedKts} · ${heading}`;
     badgeEl.textContent   = 'ACFT';
+    infoBtn.hidden        = true;
+    // Collapse the note if it was open from a previous transport selection
+    notePanel.classList.remove('open');
+    infoBtn.classList.remove('active');
     badgeEl.dataset.vtype = 'aircraft';
 
     detailEl.innerHTML = [
