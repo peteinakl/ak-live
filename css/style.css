@@ -549,6 +549,8 @@ input[type="checkbox"]:checked::after {
   z-index: 1;
 }
 
+.tracker-info-btn[hidden] { display: none; }
+
 .tracker-info-btn:hover,
 .tracker-info-btn.active {
   background: rgba(79, 216, 232, 0.12);
