@@ -85,17 +85,17 @@ export function updateForecastStrip(data) {
   strip.innerHTML = cells.join('');
 }
 
-// --- Rain radar overlay via a single pre-calculated BitmapLayer ---
-// TileLayer was requesting tiles at dynamic zoom levels which broke with
-// RainViewer's zoom caps. This approach fetches one fixed tile at zoom 7
-// covering Auckland (x=126, y=78) and renders it as a BitmapLayer with
-// hard-coded geographic bounds — no dynamic tile requests, no zoom errors.
+// --- Rain radar overlay via RainViewer tile API ---
+// Uses a deck.gl TileLayer so tile resolution matches the current map zoom.
+// maxZoom: 6 caps requests at RainViewer's radar data resolution limit —
+// the layer will use zoom-6 tiles when the map is zoomed further in.
 //
-// Tile bounds (z=7, x=126, y=78):
-//   west=174.375°  east=177.1875°  north=-36.598°  south=-38.823°
-
-const RADAR_TILE = { z: 7, x: 126, y: 78 };
-const RADAR_BOUNDS = [174.375, -38.8226, 177.1875, -36.5979]; // [W, S, E, N]
+// Note: rain radar only shows precipitation (rain, snow, hail).
+// Fog, cloud cover, and humidity are NOT visible here — those appear
+// only in the HUD/forecast strip via Open-Meteo.
+//
+// fetchRadarInfo() is called on startup and every 10 min so the overlay
+// stays current as weather systems move through.
 
 export async function fetchRadarInfo() {
   try {
@@ -105,10 +105,9 @@ export async function fetchRadarInfo() {
     if (!frames.length) return null;
     const latest = frames[frames.length - 1];
     const host = data.host ?? 'https://tilecache.rainviewer.com';
-    const { z, x, y } = RADAR_TILE;
     return {
-      tileUrl: `${host}${latest.path}/256/${z}/${x}/${y}/2/1_1.png`,
-      bounds: RADAR_BOUNDS,
+      tileUrlTemplate: `${host}${latest.path}/256/{z}/{x}/{y}/2/1_1.png`,
+      ts: latest.time,
     };
   } catch (err) {
     console.warn('[weather] radar info fetch failed:', err.message);
@@ -118,11 +117,20 @@ export async function fetchRadarInfo() {
 
 export function buildRadarLayer(radarInfo, visible) {
   if (!radarInfo) return null;
-  return new deck.BitmapLayer({
+  return new deck.TileLayer({
     id: 'rain-radar-layer',
-    image: radarInfo.tileUrl,
-    bounds: radarInfo.bounds,
+    data: radarInfo.tileUrlTemplate,
     visible,
-    opacity: 0.5,
+    opacity: 0.6,
+    tileSize: 256,
+    maxZoom: 6,
+    renderSubLayers: props => {
+      const { west, south, east, north } = props.tile.bbox;
+      return new deck.BitmapLayer(props, {
+        data: null,
+        image: props.data,
+        bounds: [west, south, east, north],
+      });
+    },
   });
 }

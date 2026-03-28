@@ -121,6 +121,15 @@ async function refreshWeather() {
   }
 }
 
+async function refreshRadar() {
+  try {
+    const info = await fetchRadarInfo();
+    if (info) { state.radarInfo = info; rebuildLayers(); }
+  } catch (err) {
+    console.warn('[radar] refresh failed:', err.message);
+  }
+}
+
 // --- Polling scheduler ---
 function startPolling() {
   refreshTransport();
@@ -130,6 +139,7 @@ function startPolling() {
   setInterval(refreshTransport, 10_000);
   setInterval(refreshAircraft,  10_000);
   setInterval(refreshWeather,   300_000);
+  setInterval(refreshRadar,     600_000); // radar frames update every ~10 min
 }
 
 // --- Init ---
