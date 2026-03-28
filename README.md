@@ -2,6 +2,9 @@
 
 Real-time geospatial dashboard for Auckland — public transport, aircraft, and weather rendered over a vector basemap using MapLibre GL JS and deck.gl.
 
+![Auckland Live — overview](ak-live1.png)
+![Auckland Live — vehicle tracking](ak-live2.png)
+
 ## Running locally
 
 You need two terminals.
