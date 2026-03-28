@@ -53,6 +53,52 @@ html, body {
   line-height: 1.6;
 }
 
+/* 24h forecast strip */
+#forecast-strip {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(80, 160, 220, 0.2);
+  scrollbar-width: none;
+}
+#forecast-strip::-webkit-scrollbar { display: none; }
+
+.fc-cell {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 38px;
+  padding: 2px 0;
+}
+
+.fc-time {
+  font-size: 0.6rem;
+  color: #506070;
+}
+
+.fc-icon {
+  font-size: 1rem;
+  line-height: 1.1;
+}
+
+.fc-temp {
+  font-size: 0.68rem;
+  color: #c0d0e0;
+}
+
+.fc-rain {
+  font-size: 0.6rem;
+  color: #3a5060;
+}
+
+.fc-rain.wet {
+  color: #7fd8ff;
+}
+
 /* Layer Controls — top-right */
 .controls-panel {
   position: fixed;

@@ -10,6 +10,16 @@ const WEATHER_URL =
   'wind_direction_10m,weather_code' +
   '&timezone=Pacific%2FAuckland';
 
+const WMO_ICON = {
+  0: '☀',  1: '🌤', 2: '⛅', 3: '☁',
+  45: '🌫', 48: '🌫',
+  51: '🌦', 53: '🌦', 55: '🌧',
+  61: '🌦', 63: '🌧', 65: '🌧',
+  71: '🌨', 73: '🌨', 75: '❄',
+  80: '🌦', 81: '🌧', 82: '🌧',
+  95: '⛈',  96: '⛈',  99: '⛈',
+};
+
 const WMO_CODES = {
   0: 'Clear sky',
   1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
@@ -40,6 +50,39 @@ export function updateWeatherHUD(data) {
     `Wind ${Math.round(c.wind_speed_10m)} km/h ${windDir(c.wind_direction_10m)}`;
   document.getElementById('hud-humidity').textContent =
     `Humidity ${c.relative_humidity_2m}%`;
+}
+
+function fmtHour(iso) {
+  const h = parseInt(iso.slice(11, 13), 10);
+  if (h === 0)  return '12am';
+  if (h === 12) return '12pm';
+  return h < 12 ? `${h}am` : `${h - 12}pm`;
+}
+
+export function updateForecastStrip(data) {
+  const strip = document.getElementById('forecast-strip');
+  if (!strip || !data.hourly) return;
+
+  // Find the first hourly slot at or after the current Auckland hour
+  const currentHour = data.current.time.slice(0, 13); // "2026-03-28T14"
+  const startIdx = data.hourly.time.findIndex(t => t.slice(0, 13) >= currentHour);
+  if (startIdx === -1) return;
+
+  const cells = [];
+  for (let i = startIdx; i < Math.min(startIdx + 24, data.hourly.time.length); i++) {
+    const temp = Math.round(data.hourly.temperature_2m[i]);
+    const rain = data.hourly.precipitation_probability[i] ?? 0;
+    const icon = WMO_ICON[data.hourly.weather_code[i]] ?? '?';
+    cells.push(
+      `<div class="fc-cell">` +
+        `<div class="fc-time">${fmtHour(data.hourly.time[i])}</div>` +
+        `<div class="fc-icon">${icon}</div>` +
+        `<div class="fc-temp">${temp}°</div>` +
+        `<div class="fc-rain${rain >= 30 ? ' wet' : ''}">${rain}%</div>` +
+      `</div>`
+    );
+  }
+  strip.innerHTML = cells.join('');
 }
 
 // --- Rain radar overlay via a single pre-calculated BitmapLayer ---

@@ -9,7 +9,7 @@ import { fetchTransportData,
 import { fetchAircraftData,
          buildAircraftLayer,
          buildAircraftTrailLayer }                           from './layers/aircraft.js';
-import { fetchWeatherData, updateWeatherHUD,
+import { fetchWeatherData, updateWeatherHUD, updateForecastStrip,
          fetchRadarInfo, buildRadarLayer }                   from './layers/weather.js';
 import { initControls, updateCounts,
          initBasemapToggle }                                 from './ui/controls.js';
@@ -115,6 +115,7 @@ async function refreshWeather() {
   try {
     const data = await fetchWeatherData();
     updateWeatherHUD(data);
+    updateForecastStrip(data);
   } catch (err) {
     console.warn('[weather] fetch failed:', err.message);
   }
