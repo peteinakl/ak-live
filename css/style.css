@@ -341,7 +341,7 @@ input[type="checkbox"]:checked::after {
   display: flex;
   flex-direction: column;
   width: 280px;
-  padding: 12px 14px 14px;
+  padding: 12px 14px 28px; /* extra bottom room for the absolute i button */
   background: linear-gradient(
     155deg,
     rgba(20, 42, 68, 0.60) 0%,
@@ -524,8 +524,11 @@ input[type="checkbox"]:checked::after {
   border: 0.5px solid rgba(255, 160, 40, 0.28);
 }
 
-/* ── Info button ── */
+/* ── Info button — absolute bottom-right of the card ── */
 .tracker-info-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 12px;
   background: rgba(255, 255, 255, 0.06);
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 50%;
@@ -535,14 +538,15 @@ input[type="checkbox"]:checked::after {
   font-family: Georgia, serif; /* intentional — the classic info 'i' */
   cursor: pointer;
   padding: 0;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   line-height: 1;
+  z-index: 1;
 }
 
 .tracker-info-btn:hover,
@@ -552,29 +556,32 @@ input[type="checkbox"]:checked::after {
   color: rgba(79, 216, 232, 0.8);
 }
 
-/* ── Data note panel ── */
+/* ── Data note panel — expands below the detail grid ── */
 .tracker-data-note {
   display: flex;
   flex-direction: column;
   gap: 6px;
   overflow: hidden;
   max-height: 0;
-  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.22s ease,
-              margin 0.28s ease;
+  transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease,
+              margin 0.32s ease,
+              padding 0.32s ease;
   opacity: 0;
   margin-top: 0;
+  /* leave room for the i button so text doesn't sit under it */
+  padding-right: 24px;
 }
 
 .tracker-data-note.open {
-  max-height: 160px;
+  max-height: 240px;
   opacity: 1;
   margin-top: 10px;
 }
 
 .tracker-data-note p {
   font-size: 0.66rem;
-  line-height: 1.5;
+  line-height: 1.55;
   color: rgba(180, 210, 232, 0.55);
   letter-spacing: 0.01em;
 }
