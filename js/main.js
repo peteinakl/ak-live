@@ -16,6 +16,8 @@ import { initControls, updateCounts,
 import { setWeatherHudVisible }                              from './ui/hud.js';
 import { showTransportDetail, showAircraftDetail,
          hidePanel }                                         from './ui/detail-panel.js';
+import { initTracker, startTracking, stopTracking,
+         updateTracker }                                     from './ui/tracker.js';
 
 // --- App state ---
 const state = {
@@ -67,9 +69,15 @@ function updateAircraftTrails(aircraft) {
 
 // --- Click handler ---
 function onLayerClick({ object, layer }) {
-  if (!object) { hidePanel(); return; }
-  if (layer.id === 'transport-layer') showTransportDetail(object);
-  if (layer.id === 'aircraft-layer')  showAircraftDetail(object);
+  if (!object) { hidePanel(); stopTracking(); return; }
+  if (layer.id === 'transport-layer') {
+    hidePanel();
+    startTracking(object, 'transport');
+  }
+  if (layer.id === 'aircraft-layer') {
+    hidePanel();
+    startTracking(object, 'aircraft');
+  }
 }
 
 // --- Layer rebuild ---
@@ -96,6 +104,7 @@ async function refreshTransport() {
     state.vehicles = await fetchTransportData();
     updateVehicleTrails(state.vehicles);
     rebuildLayers();
+    updateTracker(state.vehicles, state.aircraft);
   } catch (err) {
     console.warn('[transport] fetch failed, keeping last data:', err.message);
   }
@@ -106,6 +115,7 @@ async function refreshAircraft() {
     state.aircraft = await fetchAircraftData();
     updateAircraftTrails(state.aircraft);
     rebuildLayers();
+    updateTracker(state.vehicles, state.aircraft);
   } catch (err) {
     console.warn('[aircraft] fetch failed, keeping last data:', err.message);
   }
@@ -151,6 +161,7 @@ async function init() {
 
   const { map, overlay: deckOverlay } = initMap(config.MAPTILER_KEY, onLayerClick);
   overlay = deckOverlay;
+  initTracker(map);
 
   initControls({
     onTransportToggle: v => { state.visible.transport = v; rebuildLayers(); },

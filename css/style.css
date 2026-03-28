@@ -332,6 +332,212 @@ input[type="checkbox"]:checked::after {
     0 0 10px rgba(79, 216, 232, 0.15);
 }
 
+/* ─── Tracker HUD — vehicle follow mode ─────────────────────── */
+.tracker-hud {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(calc(-100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 12px;
+  background: linear-gradient(
+    155deg,
+    rgba(20, 42, 68, 0.60) 0%,
+    rgba(8, 16, 30, 0.50) 100%
+  );
+  border: 1px solid rgba(79, 216, 232, 0.22);
+  border-radius: 14px;
+  backdrop-filter: blur(48px) saturate(180%) brightness(1.06);
+  -webkit-backdrop-filter: blur(48px) saturate(180%) brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.20),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.20),
+    0 0 0 1px rgba(79, 216, 232, 0.07),
+    0 8px 32px rgba(0, 0, 0, 0.50),
+    0 0 24px rgba(79, 216, 232, 0.05);
+  z-index: 15;
+  transition: transform 0.38s cubic-bezier(0.34, 1.15, 0.64, 1), opacity 0.28s ease;
+  opacity: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Refraction overlay */
+.tracker-hud::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.045) 0%,
+    transparent 45%,
+    rgba(0, 60, 80, 0.04) 100%
+  );
+  pointer-events: none;
+}
+
+/* Cyan scan-line sweeps along the top edge while tracking */
+.tracker-hud::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(79, 216, 232, 0.65), transparent);
+  animation: tracker-scan 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.tracker-hud.visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@keyframes tracker-scan {
+  0%   { left: -60%; }
+  100% { left: 160%; }
+}
+
+/* ── Reticle ── */
+.tracker-reticle-wrap {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+/* Spinning asymmetric arc — "lock-on" ring */
+.tracker-reticle {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  border-top-color: #4fd8e8;
+  border-right-color: rgba(79, 216, 232, 0.3);
+  animation: reticle-spin 2s linear infinite;
+}
+
+/* Static crosshair — horizontal */
+.tracker-reticle-wrap::before {
+  content: '';
+  position: absolute;
+  height: 1px;
+  width: 9px;
+  background: rgba(79, 216, 232, 0.5);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Static crosshair — vertical */
+.tracker-reticle-wrap::after {
+  content: '';
+  position: absolute;
+  width: 1px;
+  height: 9px;
+  background: rgba(79, 216, 232, 0.5);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes reticle-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Info block ── */
+.tracker-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tracker-label {
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.20em;
+  color: rgba(79, 216, 232, 0.55);
+  text-transform: uppercase;
+}
+
+.tracker-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(230, 242, 255, 0.92);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.tracker-meta {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: 0.02em;
+}
+
+/* ── Type badge ── */
+.tracker-badge {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 3px 8px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.tracker-badge[data-vtype="bus"] {
+  background: rgba(30, 120, 255, 0.18);
+  color: #4a9eff;
+  border: 0.5px solid rgba(30, 120, 255, 0.28);
+}
+.tracker-badge[data-vtype="train"] {
+  background: rgba(255, 140, 30, 0.18);
+  color: #ff9040;
+  border: 0.5px solid rgba(255, 140, 30, 0.28);
+}
+.tracker-badge[data-vtype="ferry"] {
+  background: rgba(30, 200, 180, 0.18);
+  color: #30c8b4;
+  border: 0.5px solid rgba(30, 200, 180, 0.28);
+}
+.tracker-badge[data-vtype="aircraft"] {
+  background: rgba(255, 160, 40, 0.18);
+  color: #ffa040;
+  border: 0.5px solid rgba(255, 160, 40, 0.28);
+}
+
+/* ── Close button ── */
+.tracker-close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.30);
+  font-size: 0.68rem;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tracker-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.65);
+}
+
 /* ─── Branding — bottom centre ───────────────────────────────── */
 .brand {
   position: fixed;
