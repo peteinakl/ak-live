@@ -5,6 +5,7 @@
 let _map         = null;
 let _trackedId   = null;   // vehicle.id or aircraft.icao24
 let _trackedType = null;   // 'transport' | 'aircraft'
+let _marker      = null;   // maplibregl.Marker for the on-map callout
 
 const hud      = document.getElementById('tracker-hud');
 const nameEl   = document.getElementById('tracker-name');
@@ -35,12 +36,14 @@ export function startTracking(entity, type) {
 
   _renderHUD(entity, type);
   hud.classList.add('visible');
+  _placeMarker(entity);
 }
 
 export function stopTracking() {
   _trackedId   = null;
   _trackedType = null;
   hud.classList.remove('visible');
+  if (_marker) { _marker.remove(); _marker = null; }
 }
 
 // Called after each data poll — re-centres map and refreshes HUD values.
@@ -56,8 +59,44 @@ export function updateTracker(vehicles, aircraft) {
     return;
   }
 
-  _map.easeTo({ center: entity.position.slice(0, 2), duration: 1800 });
+  const pos = entity.position.slice(0, 2);
+  _map.easeTo({ center: pos, duration: 1800 });
   _renderHUD(entity, _trackedType);
+  if (_marker) { _marker.setLngLat(pos); _updateCalloutLabel(entity, _trackedType); }
+}
+
+// ── Marker ───────────────────────────────────────────────────────
+
+function _placeMarker(entity) {
+  if (_marker) { _marker.remove(); _marker = null; }
+
+  const el = document.createElement('div');
+  el.className = 'track-marker';
+  el.innerHTML = `
+    <div class="track-ring track-ring--1"></div>
+    <div class="track-ring track-ring--2"></div>
+    <div class="track-lock-ring"></div>
+    <div class="track-callout">
+      <div class="track-callout-tag" id="track-callout-label"></div>
+      <div class="track-callout-stem"></div>
+    </div>`;
+
+  _marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+    .setLngLat(entity.position.slice(0, 2))
+    .addTo(_map);
+
+  _updateCalloutLabel(entity, _trackedType);
+}
+
+function _updateCalloutLabel(entity, type) {
+  const el = document.getElementById('track-callout-label');
+  if (!el) return;
+  if (type === 'transport') {
+    el.textContent = entity.vehicleLabel ||
+      (entity.routeLabel ? `Route ${entity.routeLabel}` : `Vehicle ${entity.vehicleId}`);
+  } else {
+    el.textContent = entity.callsign || entity.icao24;
+  }
 }
 
 // ── Internal ────────────────────────────────────────────────────
