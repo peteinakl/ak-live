@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auckland Live</title>
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
   <script src="https://unpkg.com/deck.gl@9/dist.min.js"></script>
@@ -15,49 +19,76 @@
   <div id="map"></div>
 
   <!-- Weather HUD — top-left -->
-  <div id="weather-hud" class="hud">
-    <div id="hud-temp">--°C</div>
-    <div id="hud-desc">Loading…</div>
-    <div id="hud-wind">Wind: --</div>
-    <div id="hud-humidity">Humidity: --%</div>
+  <div id="weather-hud" class="panel hud">
+    <div class="hud-current">
+      <div id="hud-temp">--°</div>
+      <div class="hud-right">
+        <div id="hud-desc">Loading…</div>
+        <div id="hud-wind">-- km/h --</div>
+        <div id="hud-humidity">-- % humidity</div>
+      </div>
+    </div>
     <div id="forecast-strip"></div>
   </div>
 
   <!-- Layer Controls — top-right -->
-  <div id="controls" class="controls-panel">
-    <div class="control-row">
-      <label>
-        <input type="checkbox" id="toggle-transport" checked>
-        Transport <span id="count-transport" class="count">--</span>
-      </label>
+  <div id="controls" class="panel controls-panel">
+    <div class="panel-header">
+      <span class="live-dot"></span>
+      LAYERS
     </div>
+
     <div class="control-row">
-      <label>
-        <input type="checkbox" id="toggle-aircraft" checked>
-        Flights <span id="count-aircraft" class="count">--</span>
+      <input type="checkbox" id="toggle-transport" checked>
+      <label for="toggle-transport">
+        <span class="layer-dot" style="background:#1e78ff"></span>
+        Transport
       </label>
+      <span id="count-transport" class="count">--</span>
     </div>
+
     <div class="control-row">
-      <label>
-        <input type="checkbox" id="toggle-weather" checked>
+      <input type="checkbox" id="toggle-aircraft" checked>
+      <label for="toggle-aircraft">
+        <span class="layer-dot" style="background:#ff8020"></span>
+        Flights
+      </label>
+      <span id="count-aircraft" class="count">--</span>
+    </div>
+
+    <div class="control-row">
+      <input type="checkbox" id="toggle-weather" checked>
+      <label for="toggle-weather">
+        <span class="layer-dot" style="background:#7fd8ff"></span>
         Weather
       </label>
     </div>
+
     <div class="control-row">
-      <label>
-        <input type="checkbox" id="toggle-traffic" checked>
+      <input type="checkbox" id="toggle-traffic" checked>
+      <label for="toggle-traffic">
+        <span class="layer-dot" style="background:#50c840"></span>
         Traffic
       </label>
     </div>
+
     <div class="control-divider"></div>
-    <div class="control-row basemap-row">
+
+    <div class="basemap-row">
       <button id="basemap-streets" class="basemap-btn active">Streets</button>
       <button id="basemap-aerial"  class="basemap-btn">Aerial</button>
     </div>
   </div>
 
+  <!-- Branding — bottom centre -->
+  <div class="brand">
+    <span class="brand-dot"></span>
+    AKL LIVE
+  </div>
+
   <!-- Detail panel — slides up from bottom on entity click -->
   <div id="detail-panel" class="detail-panel">
+    <div class="detail-handle"></div>
     <button id="detail-panel-close" aria-label="Close">✕</button>
     <div id="detail-panel-body"></div>
   </div>
