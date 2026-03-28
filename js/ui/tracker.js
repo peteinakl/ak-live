@@ -1,5 +1,6 @@
 // js/ui/tracker.js — Vehicle/aircraft follow mode
-// Centres the map on the tracked entity each poll and shows a compact HUD.
+// Centres the map on the tracked entity each poll and shows a glass HUD
+// with the full detail set (same data as the bottom popup).
 
 let _map         = null;
 let _trackedId   = null;   // vehicle.id or aircraft.icao24
@@ -9,6 +10,7 @@ const hud      = document.getElementById('tracker-hud');
 const nameEl   = document.getElementById('tracker-name');
 const metaEl   = document.getElementById('tracker-meta');
 const badgeEl  = document.getElementById('tracker-badge');
+const detailEl = document.getElementById('tracker-detail');
 const closeBtn = document.getElementById('tracker-close');
 
 closeBtn.addEventListener('click', stopTracking);
@@ -27,8 +29,8 @@ export function startTracking(entity, type) {
 
   _map.flyTo({
     center:   entity.position.slice(0, 2),
-    zoom:     Math.max(_map.getZoom(), 13),
-    duration: 1400,
+    zoom:     Math.max(_map.getZoom(), 15),
+    duration: 1600,
   });
 
   _renderHUD(entity, type);
@@ -70,6 +72,11 @@ function _vehicleType(routeId) {
   return 'bus';
 }
 
+function _row(label, value) {
+  return `<span class="tracker-detail-label">${label}</span>`
+       + `<span class="tracker-detail-value">${value}</span>`;
+}
+
 function _renderHUD(entity, type) {
   if (type === 'transport') {
     const speedKmh = entity.speed != null
@@ -77,27 +84,50 @@ function _renderHUD(entity, type) {
     const bearing  = entity.bearing != null
       ? `${Math.round(Number(entity.bearing))}°` : '—';
     const vtype    = _vehicleType(entity.routeId);
-
-    nameEl.textContent = entity.vehicleLabel ||
+    const title    = entity.vehicleLabel ||
       (entity.routeLabel ? `Route ${entity.routeLabel}` : `Vehicle ${entity.vehicleId}`);
-    metaEl.textContent = `${speedKmh} · ${bearing}`;
 
-    badgeEl.textContent = vtype.toUpperCase();
+    nameEl.textContent    = title;
+    metaEl.textContent    = `${speedKmh} · ${bearing}`;
+    badgeEl.textContent   = vtype.toUpperCase();
     badgeEl.dataset.vtype = vtype;
+
+    const rows = [];
+    if (entity.routeLabel)   rows.push(_row('Route',      entity.routeLabel));
+    if (entity.routeId)      rows.push(_row('Route ID',   entity.routeId));
+    if (entity.startTime)    rows.push(_row('Trip start', entity.startTime));
+    if (entity.directionId != null)
+      rows.push(_row('Direction', entity.directionId === 0 ? '→ Outbound' : '← Inbound'));
+    rows.push(_row('Vehicle ID', entity.vehicleId));
+    rows.push(_row('Speed',      speedKmh));
+    rows.push(_row('Bearing',    bearing));
+    detailEl.innerHTML = rows.join('');
+
   } else {
+    const altM     = Math.round(entity.altitude);
+    const altFt    = Math.round(entity.altitude * 3.281);
     const speedKts = entity.velocity != null
       ? `${Math.round(entity.velocity * 1.944)} kts` : 'n/a';
-    const altM     = entity.onGround ? 'on ground'
-      : `${Math.round(entity.altitude)} m`;
-    const heading  = entity.heading != null
-      ? `${Math.round(entity.heading)}°` : '—';
+    const status   = entity.onGround ? 'On ground' : `${altM} m / ${altFt} ft`;
+    const heading  = entity.heading != null ? `${Math.round(entity.heading)}°` : '—';
+    const vertRate = entity.vertRate != null
+      ? (entity.vertRate > 0.5 ? '↑ climbing'
+        : entity.vertRate < -0.5 ? '↓ descending' : '→ level')
+      : 'n/a';
 
-    nameEl.textContent = entity.callsign || entity.icao24;
-    metaEl.textContent = entity.onGround
+    nameEl.textContent    = entity.callsign || entity.icao24;
+    metaEl.textContent    = entity.onGround
       ? `On ground · ${heading}`
-      : `${altM} · ${speedKts} · ${heading}`;
-
-    badgeEl.textContent = 'ACFT';
+      : `${altM} m · ${speedKts} · ${heading}`;
+    badgeEl.textContent   = 'ACFT';
     badgeEl.dataset.vtype = 'aircraft';
+
+    detailEl.innerHTML = [
+      _row('ICAO24',   entity.icao24),
+      _row('Altitude', status),
+      _row('Speed',    speedKts),
+      _row('Heading',  heading),
+      _row('Vertical', vertRate),
+    ].join('');
   }
 }

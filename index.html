@@ -82,16 +82,20 @@
 
   <!-- Tracker HUD — top-centre, visible in vehicle follow mode -->
   <div id="tracker-hud" class="tracker-hud">
-    <div class="tracker-reticle-wrap">
-      <div class="tracker-reticle"></div>
+    <div class="tracker-header">
+      <div class="tracker-reticle-wrap">
+        <div class="tracker-reticle"></div>
+      </div>
+      <div class="tracker-info">
+        <div class="tracker-label">TRACKING</div>
+        <div class="tracker-name" id="tracker-name">—</div>
+        <div class="tracker-meta" id="tracker-meta">—</div>
+      </div>
+      <div class="tracker-badge" id="tracker-badge" data-vtype="bus">BUS</div>
+      <button class="tracker-close" id="tracker-close" aria-label="Stop tracking">✕</button>
     </div>
-    <div class="tracker-info">
-      <div class="tracker-label">TRACKING</div>
-      <div class="tracker-name" id="tracker-name">—</div>
-      <div class="tracker-meta" id="tracker-meta">—</div>
-    </div>
-    <div class="tracker-badge" id="tracker-badge" data-vtype="bus">BUS</div>
-    <button class="tracker-close" id="tracker-close" aria-label="Stop tracking">✕</button>
+    <div class="tracker-divider"></div>
+    <div class="tracker-detail" id="tracker-detail"></div>
   </div>
 
   <!-- Branding — bottom centre -->
