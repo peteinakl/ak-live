@@ -34,6 +34,7 @@ export const CONFIG = {
   OPENSKY_CLIENT_ID: '...',      // opensky-network.org — free account
   OPENSKY_CLIENT_SECRET: '...',
   LINZ_API_KEY: '...',           // basemaps.linz.govt.nz — free
+  TOMTOM_API_KEY: '...',         // developer.tomtom.com — free tier
 };
 ```
 
@@ -47,6 +48,7 @@ export const CONFIG = {
 | Auckland Transport | [dev-portal.at.govt.nz](https://dev-portal.at.govt.nz) | Free |
 | OpenSky Network | [opensky-network.org](https://opensky-network.org) | Free (4k credits/day authenticated) |
 | LINZ Basemaps | [basemaps.linz.govt.nz](https://basemaps.linz.govt.nz) | Free |
+| TomTom | [developer.tomtom.com](https://developer.tomtom.com) | Free (50k tile req/day) |
 | Open-Meteo | — | No key needed |
 
 ## Architecture
@@ -89,6 +91,7 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 - Weather HUD: temperature, conditions, wind, humidity
 - Layer toggles
 - Streets / Aerial basemap toggle (LINZ high-resolution orthophoto)
+- Real-time traffic flow overlay (TomTom, green=free flow → red=stopped)
 
 ## Known data quality issues
 

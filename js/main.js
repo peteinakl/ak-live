@@ -2,7 +2,7 @@
 import { loadConfig }                                        from './utils/config.js';
 import { initMap, setLayers,
          buildStreetsStyle, buildAerialStyle,
-         removeHillshadeLayers }                             from './map-init.js';
+         removeHillshadeLayers, addTrafficLayer }            from './map-init.js';
 import { fetchTransportData,
          buildTransportLayer,
          buildTransportTrailLayer }                          from './layers/transport.js';
@@ -24,7 +24,7 @@ const state = {
   vehicleTrails: new Map(),
   aircraftTrails: new Map(),
   radarInfo: null,
-  visible: { transport: true, aircraft: true, weather: true },
+  visible: { transport: true, aircraft: true, weather: true, traffic: true },
 };
 
 const MAX_TRAIL_POINTS = 15; // 15 × 10 s = 2.5 min — time-based fading handles visual cutoff
@@ -34,6 +34,7 @@ let currentBasemap = 'streets';
 let _appStarted    = false;
 let _maptilerKey   = null;
 let _linzKey       = null;
+let _tomtomKey     = null;
 
 // --- Trail history update ---
 // Each function only updates its own trail map to avoid double-appending
@@ -135,6 +136,7 @@ async function init() {
   const config = await loadConfig();
   _maptilerKey = config.MAPTILER_KEY;
   _linzKey     = config.LINZ_API_KEY;
+  _tomtomKey   = config.TOMTOM_API_KEY;
 
   const { map, overlay: deckOverlay } = initMap(config.MAPTILER_KEY, onLayerClick);
   overlay = deckOverlay;
@@ -143,6 +145,7 @@ async function init() {
     onTransportToggle: v => { state.visible.transport = v; rebuildLayers(); },
     onAircraftToggle:  v => { state.visible.aircraft  = v; rebuildLayers(); },
     onWeatherToggle:   v => { state.visible.weather   = v; setWeatherHudVisible(v); rebuildLayers(); },
+    onTrafficToggle:   v => { state.visible.traffic   = v; map.setLayoutProperty('tomtom-traffic-flow', 'visibility', v ? 'visible' : 'none'); },
   });
 
   function onBasemapChange(basemap) {
@@ -155,6 +158,8 @@ async function init() {
 
   map.on('style.load', async () => {
     if (currentBasemap === 'streets') removeHillshadeLayers(map);
+    addTrafficLayer(map, _tomtomKey);
+    map.setLayoutProperty('tomtom-traffic-flow', 'visibility', state.visible.traffic ? 'visible' : 'none');
     if (!_appStarted) {
       _appStarted = true;
       state.radarInfo = await fetchRadarInfo();

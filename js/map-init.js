@@ -60,3 +60,22 @@ export function initMap(maptilerKey, onLayerClick) {
 export function setLayers(overlay, layers) {
   overlay.setProps({ layers });
 }
+
+export function addTrafficLayer(map, tomtomKey) {
+  if (!map.getSource('tomtom-traffic')) {
+    map.addSource('tomtom-traffic', {
+      type: 'raster',
+      tiles: [`https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${tomtomKey}&tileSize=256`],
+      tileSize: 256,
+      attribution: '© <a href="https://www.tomtom.com" target="_blank">TomTom</a>',
+    });
+  }
+  if (!map.getLayer('tomtom-traffic-flow')) {
+    map.addLayer({
+      id: 'tomtom-traffic-flow',
+      type: 'raster',
+      source: 'tomtom-traffic',
+      paint: { 'raster-opacity': 0.75 },
+    });
+  }
+}

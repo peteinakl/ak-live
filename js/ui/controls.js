@@ -1,6 +1,6 @@
 // js/ui/controls.js
 
-export function initControls({ onTransportToggle, onAircraftToggle, onWeatherToggle }) {
+export function initControls({ onTransportToggle, onAircraftToggle, onWeatherToggle, onTrafficToggle }) {
   document.getElementById('toggle-transport').addEventListener('change', e => {
     onTransportToggle(e.target.checked);
   });
@@ -9,6 +9,9 @@ export function initControls({ onTransportToggle, onAircraftToggle, onWeatherTog
   });
   document.getElementById('toggle-weather').addEventListener('change', e => {
     onWeatherToggle(e.target.checked);
+  });
+  document.getElementById('toggle-traffic').addEventListener('change', e => {
+    onTrafficToggle(e.target.checked);
   });
 }
 
