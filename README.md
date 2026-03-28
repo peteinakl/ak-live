@@ -91,12 +91,15 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 - Live transport dots (blue=bus, orange=train, teal=ferry) with 2-min fading trails
 - Aircraft dots coloured by altitude (orange shades → green on ground)
-- Click any vehicle or aircraft for detail panel
+- Click any vehicle or aircraft for a glass detail panel
+- 24h hourly forecast strip (temperature, conditions, rain probability)
 - Rain radar overlay (semi-transparent over the map)
 - Weather HUD: temperature, conditions, wind, humidity
-- Layer toggles
+- Layer toggles (transport, flights, weather, traffic)
 - Streets / Aerial basemap toggle (LINZ high-resolution orthophoto)
 - Real-time traffic flow overlay (TomTom, green=free flow → red=stopped)
+- iOS 26-style liquid glass UI (backdrop-filter, specular highlights, refraction gradients)
+- Map constrained to NZ North Island — pan and zoom bounds enforced
 
 ## Known data quality issues
 
@@ -104,6 +107,5 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 ## What's not built yet
 
-- 24h forecast strip
 - Cloudflare Worker + Pages deployment
 - Mobile responsive layout

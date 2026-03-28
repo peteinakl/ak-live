@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Auckland Live is a real-time geospatial web dashboard visualizing public transport, aircraft, traffic flow, and weather over Auckland, NZ. Dark ATC/radar aesthetic, WebGL-accelerated rendering, all free-tier APIs.
 
-**Current state:** Fully functional local MVP. Cloudflare Worker + Pages deployment not yet done.
+**Current state (v1.1):** Fully functional local MVP. Cloudflare Worker + Pages deployment not yet done.
 
 ## Running Locally
 
@@ -52,6 +52,10 @@ Open `http://localhost:3000`. Config requires `config.local.js` (gitignored — 
 **Trail fading:** Transport trails use time-based per-segment alpha. Each trail point stores `ts: Date.now()`. The `buildTransportTrailLayer` function computes age per segment and maps it to alpha (0 at 2 min old, 200 at fresh). `MAX_TRAIL_POINTS = 15` gives a 2.5 min buffer at 10s polling.
 
 **AT speed cap:** `position.speed` is capped at 38.9 m/s (140 km/h) — AT's feed sometimes sends GPS Doppler spikes of 80–100 m/s.
+
+**Map bounds:** `maxBounds` restricts panning to the NZ North Island (172.5–178.6°E, 41.7–34.3°S). `minZoom: 7` prevents zooming out to South Island. All live data is Auckland-only.
+
+**Liquid glass UI:** All panels use `backdrop-filter: blur(48px) saturate(180%) brightness(1.06)` with low-opacity backgrounds so map colours bleed through. A `::before` pseudo-element adds a refraction gradient. The detail panel uses the same recipe at `blur(56px)`. Do not replace with opaque backgrounds.
 
 ### File Structure
 
