@@ -40,9 +40,12 @@ export function initMap(maptilerKey, onLayerClick) {
     style: buildStreetsStyle(maptilerKey),
     center: [174.7570, -36.8438],  // [lng, lat] — Victoria Park Market
     zoom: 12,
+    minZoom: 7,
     pitch: 50,
     bearing: 160,
     antialias: true,
+    // Constrain to NZ North Island — data coverage is Auckland-only
+    maxBounds: [172.5, -41.7, 178.6, -34.3],
   });
 
   // deck.gl overlay — synchronises camera with MapLibre
