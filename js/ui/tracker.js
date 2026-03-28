@@ -7,14 +7,20 @@ let _trackedId   = null;   // vehicle.id or aircraft.icao24
 let _trackedType = null;   // 'transport' | 'aircraft'
 let _marker      = null;   // maplibregl.Marker for the on-map callout
 
-const hud      = document.getElementById('tracker-hud');
-const nameEl   = document.getElementById('tracker-name');
-const metaEl   = document.getElementById('tracker-meta');
-const badgeEl  = document.getElementById('tracker-badge');
-const detailEl = document.getElementById('tracker-detail');
-const closeBtn = document.getElementById('tracker-close');
+const hud        = document.getElementById('tracker-hud');
+const nameEl     = document.getElementById('tracker-name');
+const metaEl     = document.getElementById('tracker-meta');
+const badgeEl    = document.getElementById('tracker-badge');
+const detailEl   = document.getElementById('tracker-detail');
+const closeBtn   = document.getElementById('tracker-close');
+const infoBtn    = document.getElementById('tracker-info-btn');
+const notePanel  = document.getElementById('tracker-data-note');
 
 closeBtn.addEventListener('click', stopTracking);
+infoBtn.addEventListener('click', () => {
+  const open = notePanel.classList.toggle('open');
+  infoBtn.classList.toggle('active', open);
+});
 
 export function initTracker(map) {
   _map = map;
@@ -43,6 +49,8 @@ export function stopTracking() {
   _trackedId   = null;
   _trackedType = null;
   hud.classList.remove('visible');
+  notePanel.classList.remove('open');
+  infoBtn.classList.remove('active');
   if (_marker) { _marker.remove(); _marker = null; }
 }
 
