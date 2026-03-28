@@ -20,25 +20,58 @@ html, body {
   inset: 0;
 }
 
-/* ─── Glass panel — shared base ─────────────────────────────── */
+/* ─── Liquid glass panel — shared base ──────────────────────── */
+/*
+ * iOS 26-style liquid glass:
+ *   - Low-opacity background lets the blurred map colours bleed through
+ *   - saturate(180%) amplifies those colours so each panel looks tinted
+ *     by whatever's behind it (blue over water, etc.)
+ *   - Bright inset top edge = specular highlight from "glass thickness"
+ *   - Subtle internal refraction gradient via ::before
+ */
 .panel {
   position: fixed;
-  background: rgba(5, 9, 18, 0.92);
-  border: 0.5px solid rgba(127, 216, 255, 0.14);
-  border-radius: 6px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: linear-gradient(
+    155deg,
+    rgba(20, 42, 68, 0.48) 0%,
+    rgba(8, 16, 30, 0.38) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(48px) saturate(180%) brightness(1.06);
+  -webkit-backdrop-filter: blur(48px) saturate(180%) brightness(1.06);
   z-index: 10;
-  /* Top-edge glass highlight */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 4px 24px rgba(0, 0, 0, 0.5);
+    /* specular — top edge catches light */
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    /* inner bottom shadow — glass depth */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    /* outer ambient glow */
+    0 8px 40px rgba(0, 0, 0, 0.45),
+    0 2px 10px rgba(0, 0, 0, 0.35);
+  /* needed for ::before refraction overlay */
+  overflow: hidden;
+}
+
+/* Internal refraction — angled light catch across the surface */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.045) 0%,
+    transparent 45%,
+    rgba(0, 60, 80, 0.04) 100%
+  );
+  pointer-events: none;
 }
 
 /* ─── Live pulse dot ─────────────────────────────────────────── */
 @keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(93, 220, 245, 0.5); }
-  60%       { opacity: 0.8; box-shadow: 0 0 0 5px rgba(93, 220, 245, 0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(93, 220, 245, 0.55); }
+  60%       { opacity: 0.75; box-shadow: 0 0 0 5px rgba(93, 220, 245, 0); }
 }
 
 .live-dot, .brand-dot {
@@ -55,7 +88,7 @@ html, body {
 .hud {
   top: 16px;
   left: 16px;
-  padding: 14px 16px 12px;
+  padding: 16px 18px 14px;
   min-width: 260px;
   max-width: 320px;
 }
@@ -65,15 +98,17 @@ html, body {
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 2px;
+  position: relative;
 }
 
 #hud-temp {
   font-size: 3rem;
   font-weight: 600;
-  color: #4fd8e8;
+  color: #62e0f0;
   line-height: 1;
   letter-spacing: -0.02em;
   flex-shrink: 0;
+  text-shadow: 0 0 24px rgba(79, 216, 232, 0.35);
 }
 
 .hud-right {
@@ -86,15 +121,15 @@ html, body {
 #hud-desc {
   font-size: 0.78rem;
   font-weight: 500;
-  color: #e0c87a;
+  color: #ecd07c;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
 }
 
 #hud-wind,
 #hud-humidity {
   font-size: 0.68rem;
-  color: #4a6070;
+  color: #5a7080;
   letter-spacing: 0.02em;
 }
 
@@ -105,7 +140,7 @@ html, body {
   overflow-x: auto;
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 0.5px solid rgba(127, 216, 255, 0.1);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.08);
   scrollbar-width: none;
 }
 #forecast-strip::-webkit-scrollbar { display: none; }
@@ -117,18 +152,18 @@ html, body {
   align-items: center;
   gap: 3px;
   min-width: 40px;
-  padding: 4px 2px;
-  border-radius: 4px;
-  transition: background 0.15s;
+  padding: 5px 2px;
+  border-radius: 8px;
+  transition: background 0.18s;
 }
 
 .fc-cell:hover {
-  background: rgba(127, 216, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .fc-time {
   font-size: 0.58rem;
-  color: #3a5060;
+  color: #4a6070;
   letter-spacing: 0.02em;
 }
 
@@ -140,12 +175,12 @@ html, body {
 .fc-temp {
   font-size: 0.68rem;
   font-weight: 500;
-  color: #b0c8d8;
+  color: #c0d8e8;
 }
 
 .fc-rain {
   font-size: 0.58rem;
-  color: #2a4050;
+  color: #344a58;
   letter-spacing: 0.01em;
 }
 
@@ -157,8 +192,8 @@ html, body {
 .controls-panel {
   top: 16px;
   right: 16px;
-  padding: 12px 14px 14px;
-  min-width: 172px;
+  padding: 13px 15px 15px;
+  min-width: 176px;
 }
 
 .panel-header {
@@ -168,9 +203,9 @@ html, body {
   font-size: 0.58rem;
   font-weight: 600;
   letter-spacing: 0.18em;
-  color: #3a5060;
+  color: rgba(255, 255, 255, 0.28);
   text-transform: uppercase;
-  margin-bottom: 12px;
+  margin-bottom: 13px;
 }
 
 /* ─── Custom toggle switches ─────────────────────────────────── */
@@ -178,7 +213,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-bottom: 9px;
+  margin-bottom: 10px;
 }
 
 .control-row:last-child { margin-bottom: 0; }
@@ -190,7 +225,7 @@ html, body {
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 400;
-  color: #8aa8bc;
+  color: rgba(200, 220, 240, 0.75);
   flex: 1;
   user-select: none;
   letter-spacing: 0.02em;
@@ -201,7 +236,7 @@ html, body {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  opacity: 0.8;
+  opacity: 0.85;
 }
 
 input[type="checkbox"] {
@@ -209,13 +244,14 @@ input[type="checkbox"] {
   -webkit-appearance: none;
   width: 30px;
   height: 17px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 0.5px solid rgba(127, 216, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
   border-radius: 9px;
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.22s, border-color 0.22s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 input[type="checkbox"]::after {
@@ -223,26 +259,28 @@ input[type="checkbox"]::after {
   position: absolute;
   width: 11px;
   height: 11px;
-  background: #3a5060;
+  background: rgba(180, 200, 220, 0.5);
   border-radius: 50%;
   top: 2.5px;
   left: 2.5px;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.22s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 input[type="checkbox"]:checked {
-  background: rgba(79, 216, 232, 0.15);
-  border-color: rgba(79, 216, 232, 0.45);
+  background: rgba(79, 216, 232, 0.25);
+  border-color: rgba(79, 216, 232, 0.5);
 }
 
 input[type="checkbox"]:checked::after {
   transform: translateX(13px);
   background: #4fd8e8;
+  box-shadow: 0 0 6px rgba(79, 216, 232, 0.5), 0 1px 3px rgba(0,0,0,0.3);
 }
 
 .count {
   font-size: 0.65rem;
-  color: #2a4050;
+  color: rgba(255,255,255,0.2);
   margin-left: auto;
   letter-spacing: 0.02em;
   min-width: 24px;
@@ -252,7 +290,7 @@ input[type="checkbox"]:checked::after {
 /* ─── Divider ────────────────────────────────────────────────── */
 .control-divider {
   height: 0.5px;
-  background: linear-gradient(90deg, transparent, rgba(127, 216, 255, 0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
   margin: 10px 0;
 }
 
@@ -264,29 +302,34 @@ input[type="checkbox"]:checked::after {
 
 .basemap-btn {
   flex: 1;
-  padding: 5px 8px;
-  background: transparent;
-  border: 0.5px solid rgba(127, 216, 255, 0.15);
-  border-radius: 4px;
-  color: #3a5060;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.3);
   font-family: inherit;
   font-size: 0.72rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.18s, color 0.18s, border-color 0.18s, box-shadow 0.18s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 .basemap-btn:hover {
-  border-color: rgba(79, 216, 232, 0.35);
-  color: #6a98ac;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .basemap-btn.active {
-  background: rgba(79, 216, 232, 0.1);
-  border-color: rgba(79, 216, 232, 0.5);
-  color: #4fd8e8;
+  background: rgba(79, 216, 232, 0.18);
+  border-color: rgba(79, 216, 232, 0.45);
+  color: #62e0f0;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 0 10px rgba(79, 216, 232, 0.15);
 }
 
 /* ─── Branding — bottom centre ───────────────────────────────── */
@@ -298,13 +341,19 @@ input[type="checkbox"]:checked::after {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 600;
   letter-spacing: 0.22em;
-  color: #2a3a45;
+  color: rgba(255, 255, 255, 0.2);
   text-transform: uppercase;
   z-index: 10;
   pointer-events: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 5px 13px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 /* ─── Detail panel — slides up from bottom ───────────────────── */
@@ -314,16 +363,36 @@ input[type="checkbox"]:checked::after {
   left: 50%;
   transform: translateX(-50%) translateY(100%);
   width: min(440px, 100%);
-  background: rgba(5, 9, 18, 0.97);
-  border: 0.5px solid rgba(127, 216, 255, 0.16);
+  /* slightly more opaque than floating panels for readability */
+  background: linear-gradient(
+    160deg,
+    rgba(14, 28, 48, 0.82) 0%,
+    rgba(6, 12, 24, 0.78) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-bottom: none;
-  border-radius: 10px 10px 0 0;
+  border-radius: 18px 18px 0 0;
   padding: 8px 22px 32px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(56px) saturate(160%);
+  -webkit-backdrop-filter: blur(56px) saturate(160%);
   z-index: 20;
-  transition: transform 0.28s cubic-bezier(0.32, 0, 0.15, 1);
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.6);
+  transition: transform 0.3s cubic-bezier(0.32, 0, 0.15, 1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 -12px 50px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.detail-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
 }
 
 .detail-panel.open {
@@ -331,30 +400,36 @@ input[type="checkbox"]:checked::after {
 }
 
 .detail-handle {
-  width: 32px;
+  width: 36px;
   height: 3px;
-  background: rgba(127, 216, 255, 0.15);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 2px;
-  margin: 0 auto 14px;
+  margin: 0 auto 16px;
 }
 
 #detail-panel-close {
   position: absolute;
   top: 14px;
   right: 16px;
-  background: none;
-  border: none;
-  color: #3a5060;
-  font-size: 0.85rem;
+  background: rgba(255,255,255,0.06);
+  border: 0.5px solid rgba(255,255,255,0.1);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.75rem;
   cursor: pointer;
-  padding: 4px 8px;
-  line-height: 1;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: inherit;
-  transition: color 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 #detail-panel-close:hover {
-  color: #7a9aac;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .detail-type {
@@ -365,13 +440,13 @@ input[type="checkbox"]:checked::after {
   margin-bottom: 5px;
 }
 
-.detail-type.bus     { color: #1e78ff; }
-.detail-type.aircraft { color: #ff8020; }
+.detail-type.bus     { color: #4a9eff; }
+.detail-type.aircraft { color: #ffa040; }
 
 .detail-title {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #e0eef8;
+  color: rgba(230, 242, 255, 0.92);
   margin-bottom: 16px;
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -380,18 +455,18 @@ input[type="checkbox"]:checked::after {
 .detail-grid {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 7px 20px;
+  gap: 8px 20px;
   font-size: 0.78rem;
 }
 
 .detail-label {
-  color: #3a5060;
+  color: rgba(255, 255, 255, 0.28);
   white-space: nowrap;
   letter-spacing: 0.02em;
 }
 
 .detail-grid span:not(.detail-label) {
-  color: #9abccc;
+  color: rgba(180, 210, 232, 0.85);
   font-weight: 500;
 }
 
@@ -401,15 +476,15 @@ input[type="checkbox"]:checked::after {
 }
 
 .maplibregl-ctrl-attrib {
-  background: rgba(5, 9, 18, 0.7) !important;
-  color: #2a4050 !important;
+  background: rgba(8, 16, 30, 0.55) !important;
+  color: rgba(255,255,255,0.25) !important;
   font-family: 'IBM Plex Mono', monospace !important;
   font-size: 0.6rem !important;
-  backdrop-filter: blur(8px);
-  border: 0.5px solid rgba(127, 216, 255, 0.08) !important;
-  border-radius: 4px !important;
+  backdrop-filter: blur(16px) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px !important;
 }
 
 .maplibregl-ctrl-attrib a {
-  color: #3a6070 !important;
+  color: rgba(255,255,255,0.35) !important;
 }
