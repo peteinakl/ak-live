@@ -91,7 +91,11 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 - Live transport dots (blue=bus, orange=train, teal=ferry) with 2-min fading trails
 - Aircraft dots coloured by altitude (orange shades → green on ground)
-- Click any vehicle or aircraft for a glass detail panel
+- **Vehicle follow mode** — click any dot to lock on: map flies to zoom 15 and tracks the vehicle each poll
+  - Tracker HUD slides in at top-centre with full detail (route, speed, bearing/altitude, direction)
+  - On-map callout: two staggered pulsing lock-on rings + glass label tag above the vehicle
+  - Click empty map or ✕ to release; auto-releases if vehicle drops off the feed
+  - AT data quality note (ⓘ, transport only) — explains GPS speed spikes and self-reported vehicle types
 - 24h hourly forecast strip (temperature, conditions, rain probability)
 - Rain radar overlay (RainViewer, refreshes every 10 min, linear-filtered for smooth rendering)
 - Weather HUD: temperature, conditions, wind, humidity
@@ -104,6 +108,7 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 ## Known data quality issues
 
 - **AT speed data**: AT's GTFS-RT feed sometimes reports speed as the raw GPS Doppler value, which can spike to 80–100 m/s (~300 km/h) momentarily, especially as a bus pulls away from a stop. Speeds above 140 km/h are capped and shown as n/a.
+- **AT vehicle type**: Self-reported by the operator — misclassifications are common (buses appearing in the Waitematā Harbour, etc.). Not a bug.
 
 ## What's not built yet
 

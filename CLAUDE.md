@@ -59,6 +59,8 @@ Open `http://localhost:3000`. Config requires `config.local.js` (gitignored — 
 
 **Liquid glass UI:** All panels use `backdrop-filter: blur(48px) saturate(180%) brightness(1.06)` with low-opacity backgrounds so map colours bleed through. A `::before` pseudo-element adds a refraction gradient. The detail panel uses the same recipe at `blur(56px)`. Do not replace with opaque backgrounds.
 
+**Vehicle follow/track mode (`js/ui/tracker.js`):** Clicking a transport dot or aircraft enters follow mode. `startTracking(entity, type)` stores the tracked ID, calls `map.flyTo` (zoom ≥15), shows the tracker HUD, and places a `maplibregl.Marker` on the entity. `updateTracker(vehicles, aircraft)` is called after every poll — it re-centres via `map.easeTo` and refreshes the HUD. `stopTracking()` removes the marker and hides the HUD. The AT data quality info note (ⓘ button) is shown for transport only (`infoBtn.hidden = true` for aircraft); CSS `display: flex` overrides the `hidden` attribute so a `[hidden] { display: none }` rule is required. The bottom detail panel is suppressed while tracking — the tracker HUD carries all the same fields.
+
 ### File Structure
 
 ```
@@ -77,8 +79,9 @@ js/
     weather.js             # Open-Meteo fetch, RainViewer BitmapLayer
   ui/
     controls.js            # Checkbox toggles + basemap button pair
-    detail-panel.js        # Slide-in panel for clicked vehicles/aircraft
+    detail-panel.js        # Slide-in bottom panel (suppressed during follow mode)
     hud.js                 # Weather HUD DOM updates
+    tracker.js             # Vehicle follow mode: HUD, map.flyTo/easeTo, MapLibre marker callout
   utils/
     api-client.js          # Routes AT/OpenSky through proxy on localhost
     config.js              # Dynamic import of config.local.js
