@@ -6,6 +6,33 @@ export function buildStreetsStyle(maptilerKey) {
   return `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`;
 }
 
+// Recolour the existing tile style so roads and neighbourhoods provide context
+// without competing with the live layers. No extra tile source is required.
+export function applyNightStyle(map) {
+  for (const layer of map.getStyle().layers) {
+    const id = layer.id.toLowerCase();
+    if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', '#091421');
+    if (layer.type === 'fill') {
+      const color = /water/.test(id) ? '#0b2537' : /park|wood|landcover|grass/.test(id) ? '#102b2c'
+        : /building/.test(id) ? '#233547' : '#142131';
+      map.setPaintProperty(layer.id, 'fill-color', color);
+      map.setPaintProperty(layer.id, 'fill-outline-color', color);
+    }
+    if (layer.type === 'line') {
+      map.setPaintProperty(layer.id, 'line-color', /motorway|trunk/.test(id) ? '#405264' : '#2b3b4c');
+    }
+    if (layer.type === 'fill-extrusion') map.setPaintProperty(layer.id, 'fill-extrusion-color', '#26394b');
+    if (layer.type === 'symbol') {
+      if (/poi|housenumber/.test(id)) map.setLayoutProperty(layer.id, 'visibility', 'none');
+      else {
+        map.setPaintProperty(layer.id, 'text-color', /place|settlement/.test(id) ? '#afc5d5' : '#7d96a9');
+        map.setPaintProperty(layer.id, 'text-halo-color', '#101e2c');
+        map.setPaintProperty(layer.id, 'text-halo-width', 1.2);
+      }
+    }
+  }
+}
+
 export function buildAerialStyle(linzKey) {
   return {
     version: 8,
@@ -38,11 +65,11 @@ export function initMap(maptilerKey, onLayerClick) {
   const map = new maplibregl.Map({
     container: 'map',
     style: buildStreetsStyle(maptilerKey),
-    center: [174.7570, -36.8438],  // [lng, lat] — Victoria Park Market
-    zoom: 12,
+    center: [174.773, -36.828],  // [lng, lat] — Waitematā Harbour scene
+    zoom: 12.8,
     minZoom: 7,
     pitch: 50,
-    bearing: 160,
+    bearing: 145,
     antialias: true,
     // Constrain to NZ North Island — data coverage is Auckland-only
     maxBounds: [172.5, -41.7, 178.6, -34.3],
@@ -51,6 +78,7 @@ export function initMap(maptilerKey, onLayerClick) {
   // deck.gl overlay — synchronises camera with MapLibre
   const overlay = new deck.MapboxOverlay({
     interleaved: false,
+    pickingRadius: 8,
     layers: [],
     onClick: onLayerClick ?? null,
   });
@@ -78,7 +106,7 @@ export function addTrafficLayer(map, tomtomKey) {
       id: 'tomtom-traffic-flow',
       type: 'raster',
       source: 'tomtom-traffic',
-      paint: { 'raster-opacity': 0.75 },
+      paint: { 'raster-opacity': 0.42 },
     });
   }
 }

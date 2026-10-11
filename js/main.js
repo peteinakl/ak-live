@@ -1,206 +1,217 @@
-// js/main.js — App orchestrator
-import { loadConfig }                                        from './utils/config.js';
-import { initMap, setLayers,
-         buildStreetsStyle, buildAerialStyle,
-         removeHillshadeLayers, addTrafficLayer }            from './map-init.js';
-import { fetchTransportData,
-         buildTransportLayer,
-         buildTransportTrailLayer }                          from './layers/transport.js';
-import { fetchAircraftData,
-         buildAircraftLayer,
-         buildAircraftTrailLayer }                           from './layers/aircraft.js';
-import { fetchWeatherData, updateWeatherHUD, updateForecastStrip,
-         fetchRadarInfo, buildRadarLayer }                   from './layers/weather.js';
-import { initControls, updateCounts,
-         initBasemapToggle }                                 from './ui/controls.js';
-import { setWeatherHudVisible }                              from './ui/hud.js';
-import { showTransportDetail, showAircraftDetail,
-         hidePanel }                                         from './ui/detail-panel.js';
-import { initTracker, startTracking, stopTracking,
-         updateTracker }                                     from './ui/tracker.js';
+import { loadConfig } from './utils/config.js';
+import { initMap, setLayers, buildStreetsStyle, buildAerialStyle, removeHillshadeLayers, addTrafficLayer, applyNightStyle } from './map-init.js';
+import { fetchTransportData, buildTransportLayer, buildTransportTrailLayer } from './layers/transport.js';
+import { fetchAircraftData, buildAircraftLayer, buildAircraftTrailLayer } from './layers/aircraft.js';
+import { fetchWeatherData, updateWeatherHUD, updateForecastStrip, fetchRadarInfo, buildRadarLayer } from './layers/weather.js';
+import { initControls, updateCounts, initBasemapToggle } from './ui/controls.js';
+import { setWeatherHudVisible } from './ui/hud.js';
+import { initTracker, startTracking, stopTracking, updateTracker, syncTrackerPosition } from './ui/tracker.js';
+import { initScenes } from './ui/scenes.js';
+import { updateBriefing, updateFreshness } from './ui/briefing.js';
+import { TransportQuality } from './utils/transport-quality.js';
+import { MotionStore } from './utils/motion.js';
 
-// --- App state ---
 const state = {
-  vehicles: [],
-  aircraft: [],
-  vehicleTrails: new Map(),
-  aircraftTrails: new Map(),
-  radarInfo: null,
-  visible: { transport: true, aircraft: true, weather: true, traffic: true },
+  vehicles: [], aircraft: [], weather: null, radarInfo: null,
+  vehicleTrails: new Map(), aircraftTrails: new Map(),
+  visible: { transport: true, aircraft: true, weather: true, traffic: false },
+  feeds: { transport: {}, aircraft: {}, weather: {}, radar: {} },
 };
-
-const MAX_TRAIL_POINTS = 15; // 15 × 10 s = 2.5 min — time-based fading handles visual cutoff
-
-let overlay        = null;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const vehicleMotion = new MotionStore();
+const aircraftMotion = new MotionStore();
+const quality = new TransportQuality();
+const pending = new Set();
+let map, overlay, scenes;
+let frameId = null;
+let staticLayers = [];
 let currentBasemap = 'streets';
-let _appStarted    = false;
-let _maptilerKey   = null;
-let _linzKey       = null;
-let _tomtomKey     = null;
 
-// --- Trail history update ---
-// Each function only updates its own trail map to avoid double-appending
-// when transport and aircraft polls interleave.
-function updateVehicleTrails(vehicles) {
-  const seen = new Set(vehicles.map(v => v.id));
-  for (const v of vehicles) {
-    const hist = state.vehicleTrails.get(v.id) ?? [];
-    hist.push({ position: v.position, routeId: v.routeId, ts: Date.now() });
-    if (hist.length > MAX_TRAIL_POINTS) hist.shift();
-    state.vehicleTrails.set(v.id, hist);
+function updateTrails(entities, history, key) {
+  const seen = new Set();
+  for (const entity of entities) {
+    seen.add(entity[key]);
+    if (!entity.timestamp || Date.now() - entity.timestamp > 120_000 || entity.positionQuality === 'rejected') continue;
+    const points = history.get(entity[key]) ?? [];
+    if (points.at(-1)?.ts >= entity.timestamp) continue;
+    points.push({ ...entity, ts: entity.timestamp });
+    // Disconnected observations should not paint a line across a feed gap.
+    if (points.length > 1 && entity.timestamp - points.at(-2).ts > 120_000) points.splice(0, points.length - 1);
+    while (points.length > 15 || (points.length && entity.timestamp - points[0].ts > 120_000)) points.shift();
+    history.set(entity[key], points);
   }
-  for (const id of state.vehicleTrails.keys()) {
-    if (!seen.has(id)) state.vehicleTrails.delete(id);
-  }
+  for (const id of history.keys()) if (!seen.has(id)) history.delete(id);
 }
 
-function updateAircraftTrails(aircraft) {
-  const seen = new Set(aircraft.map(a => a.icao24));
-  for (const a of aircraft) {
-    const hist = state.aircraftTrails.get(a.icao24) ?? [];
-    hist.push({ position: a.position, altitude: a.altitude, onGround: a.onGround });
-    if (hist.length > MAX_TRAIL_POINTS) hist.shift();
-    state.aircraftTrails.set(a.icao24, hist);
-  }
-  for (const id of state.aircraftTrails.keys()) {
-    if (!seen.has(id)) state.aircraftTrails.delete(id);
-  }
-}
-
-// --- Click handler ---
-function onLayerClick({ object, layer }) {
-  if (!object) { hidePanel(); stopTracking(); return; }
-  if (layer.id === 'transport-layer') {
-    hidePanel();
-    startTracking(object, 'transport');
-  }
-  if (layer.id === 'aircraft-layer') {
-    hidePanel();
-    startTracking(object, 'aircraft');
-  }
-}
-
-// --- Layer rebuild ---
-// Order: radar → trails → dots (each group renders above the previous)
-function rebuildLayers() {
+function renderMotion(now = performance.now()) {
   if (!overlay) return;
-  const layers = [
+  const vehicles = vehicleMotion.get(now);
+  const aircraft = aircraftMotion.get(now);
+  setLayers(overlay, [...staticLayers,
+    buildTransportLayer(vehicles, state.visible.transport),
+    buildAircraftLayer(aircraft, state.visible.aircraft),
+  ].filter(Boolean));
+  syncTrackerPosition(vehicles, aircraft);
+}
+
+function animate(now) {
+  frameId = null;
+  if (document.hidden) return;
+  renderMotion(now);
+  if (vehicleMotion.isAnimating(now) || aircraftMotion.isAnimating(now)) frameId = requestAnimationFrame(animate);
+}
+
+function requestAnimation() {
+  if (document.hidden || frameId !== null) return;
+  frameId = requestAnimationFrame(animate);
+}
+
+function rebuildLayers() {
+  staticLayers = [
     buildRadarLayer(state.radarInfo, state.visible.weather),
     buildTransportTrailLayer(state.vehicleTrails, state.visible.transport),
-    buildAircraftTrailLayer(state.aircraftTrails,  state.visible.aircraft),
-    buildTransportLayer(state.vehicles,            state.visible.transport),
-    buildAircraftLayer(state.aircraft,             state.visible.aircraft),
+    buildAircraftTrailLayer(state.aircraftTrails, state.visible.aircraft),
   ].filter(Boolean);
-  setLayers(overlay, layers);
-  updateCounts({
-    transport: state.vehicles.length,
-    aircraft:  state.aircraft.length,
-  });
+  renderMotion();
+  updateCounts({ transport: state.vehicles.length, aircraft: state.aircraft.length });
+  requestAnimation();
 }
 
-// --- Data refresh ---
-async function refreshTransport() {
+function updateUI() {
+  updateFreshness(state.feeds, state.radarInfo);
+  if (map) updateBriefing(state, map);
+  updateTracker(state.vehicles, state.aircraft);
+}
+
+// One in-flight request per feed; a hidden tab does not spend API credits.
+async function refresh(name, fetcher, apply) {
+  if (document.hidden || pending.has(name)) return;
+  pending.add(name);
   try {
-    state.vehicles = await fetchTransportData();
-    updateVehicleTrails(state.vehicles);
-    rebuildLayers();
-    updateTracker(state.vehicles, state.aircraft);
-  } catch (err) {
-    console.warn('[transport] fetch failed, keeping last data:', err.message);
+    const data = await fetcher();
+    if (!data) throw new Error('No feed data');
+    apply(data);
+    state.feeds[name] = { updatedAt: Date.now(), error: false };
+  } catch {
+    state.feeds[name].error = true;
+  } finally {
+    pending.delete(name);
+    updateUI();
   }
 }
+const refreshTransport = () => refresh('transport', fetchTransportData, data => {
+  state.vehicles = quality.process(data);
+  updateTrails(state.vehicles, state.vehicleTrails, 'id');
+  vehicleMotion.update(state.vehicles, 'id', performance.now(), reducedMotion.matches);
+  rebuildLayers();
+});
+const refreshAircraft = () => refresh('aircraft', fetchAircraftData, data => {
+  state.aircraft = data;
+  updateTrails(data, state.aircraftTrails, 'icao24');
+  aircraftMotion.update(data, 'icao24', performance.now(), reducedMotion.matches);
+  rebuildLayers();
+});
+const refreshWeather = () => refresh('weather', fetchWeatherData, data => {
+  state.weather = data;
+  updateWeatherHUD(data);
+  updateForecastStrip(data);
+});
+const refreshRadar = () => refresh('radar', fetchRadarInfo, data => {
+  state.radarInfo = data;
+  rebuildLayers();
+});
+function refreshAll() { refreshTransport(); refreshAircraft(); refreshWeather(); refreshRadar(); }
 
-async function refreshAircraft() {
-  try {
-    state.aircraft = await fetchAircraftData();
-    updateAircraftTrails(state.aircraft);
-    rebuildLayers();
-    updateTracker(state.vehicles, state.aircraft);
-  } catch (err) {
-    console.warn('[aircraft] fetch failed, keeping last data:', err.message);
-  }
+function setVisible(name, value) {
+  state.visible[name] = value;
+  const checkbox = document.getElementById(`toggle-${name}`);
+  if (checkbox) checkbox.checked = value;
+  if (name === 'weather') setWeatherHudVisible(value);
+  if (name === 'traffic') {
+    if (map.getLayer('tomtom-traffic-flow')) map.setLayoutProperty('tomtom-traffic-flow', 'visibility', value ? 'visible' : 'none');
+  } else rebuildLayers();
 }
 
-async function refreshWeather() {
-  try {
-    const data = await fetchWeatherData();
-    updateWeatherHUD(data);
-    updateForecastStrip(data);
-  } catch (err) {
-    console.warn('[weather] fetch failed:', err.message);
-  }
-}
-
-async function refreshRadar() {
-  try {
-    const info = await fetchRadarInfo();
-    if (info) { state.radarInfo = info; rebuildLayers(); }
-  } catch (err) {
-    console.warn('[radar] refresh failed:', err.message);
-  }
-}
-
-// --- Polling scheduler ---
-function startPolling() {
-  refreshTransport();
-  refreshAircraft();
-  refreshWeather();
-
-  setInterval(refreshTransport, 10_000);
-  setInterval(refreshAircraft,  10_000);
-  setInterval(refreshWeather,   300_000);
-  setInterval(refreshRadar,     600_000); // radar frames update every ~10 min
-}
-
-// --- Init ---
 async function init() {
   const config = await loadConfig();
-  _maptilerKey = config.MAPTILER_KEY;
-  _linzKey     = config.LINZ_API_KEY;
-  _tomtomKey   = config.TOMTOM_API_KEY;
-
-  const { map, overlay: deckOverlay } = initMap(config.MAPTILER_KEY, onLayerClick);
-  overlay = deckOverlay;
-  initTracker(map);
-
-  initControls({
-    onTransportToggle: v => { state.visible.transport = v; rebuildLayers(); },
-    onAircraftToggle:  v => { state.visible.aircraft  = v; rebuildLayers(); },
-    onWeatherToggle:   v => { state.visible.weather   = v; setWeatherHudVisible(v); rebuildLayers(); },
-    onTrafficToggle:   v => { state.visible.traffic   = v; try { map.setLayoutProperty('tomtom-traffic-flow', 'visibility', v ? 'visible' : 'none'); } catch {} },
+  const result = initMap(config.MAPTILER_KEY, ({ object, layer }) => {
+    if (!object) { stopTracking(); return; }
+    if (layer.id === 'transport-layer') startTracking(object, 'transport');
+    if (layer.id === 'aircraft-layer') startTracking(object, 'aircraft');
+    requestAnimation();
   });
-
-  function onBasemapChange(basemap) {
+  map = result.map;
+  overlay = result.overlay;
+  initTracker(map, { onStart: () => scenes?.stopTour() });
+  scenes = initScenes(map, {
+    reducedMotion, stopTracking,
+    onSelect: id => {
+      setVisible('transport', id !== 'airport');
+      setVisible('aircraft', id !== 'city');
+      setVisible('traffic', id === 'city' || id === 'region');
+    },
+  });
+  initControls({
+    onTransportToggle: v => setVisible('transport', v), onAircraftToggle: v => setVisible('aircraft', v),
+    onWeatherToggle: v => setVisible('weather', v), onTrafficToggle: v => setVisible('traffic', v),
+  });
+  initBasemapToggle(basemap => {
     if (basemap === currentBasemap) return;
     currentBasemap = basemap;
-    map.setStyle(basemap === 'aerial' ? buildAerialStyle(_linzKey) : buildStreetsStyle(_maptilerKey), { diff: false });
+    map.setStyle(basemap === 'aerial' ? buildAerialStyle(config.LINZ_API_KEY) : buildStreetsStyle(config.MAPTILER_KEY), { diff: false });
+  });
+  const compact = matchMedia('(max-width: 600px)');
+  const medium = matchMedia('(max-width: 900px)');
+  function adaptPanels() {
+    document.getElementById('controls').open = !compact.matches;
+    document.getElementById('city-briefing').open = !medium.matches;
   }
+  adaptPanels();
+  compact.addEventListener('change', adaptPanels);
+  medium.addEventListener('change', adaptPanels);
 
-  initBasemapToggle(onBasemapChange);
+  document.getElementById('insight-transport').addEventListener('click', () => scenes.select('region'));
+  document.getElementById('insight-aircraft').addEventListener('click', () => scenes.select('airport'));
+  document.getElementById('insight-weather').addEventListener('click', () => {
+    setVisible('weather', true);
+    document.getElementById('forecast-strip').scrollTo({ left: 0, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+    document.getElementById('weather-hud').animate([{ outline: '2px solid #72e3df' }, { outline: '2px solid transparent' }], { duration: reducedMotion.matches ? 0 : 1400 });
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { stopTracking(); scenes.stopTour(); map.stop(); }
+  });
+  reducedMotion.addEventListener('change', () => {
+    if (reducedMotion.matches) { vehicleMotion.finish(); aircraftMotion.finish(); }
+    rebuildLayers();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { vehicleMotion.finish(); aircraftMotion.finish(); refreshAll(); rebuildLayers(); }
+  });
+  // Recompute viewport activity after a camera move, not on each animation frame.
+  map.on('moveend', () => updateBriefing(state, map));
 
-  map.on('style.load', async () => {
-    if (currentBasemap === 'streets') removeHillshadeLayers(map);
-    addTrafficLayer(map, _tomtomKey);
-    map.setLayoutProperty('tomtom-traffic-flow', 'visibility', state.visible.traffic ? 'visible' : 'none');
-    if (!_appStarted) {
-      _appStarted = true;
-      state.radarInfo = await fetchRadarInfo();
-      startPolling();
+  let started = false;
+  map.on('style.load', () => {
+    if (currentBasemap === 'streets') { removeHillshadeLayers(map); applyNightStyle(map); }
+    if (config.TOMTOM_API_KEY) {
+      addTrafficLayer(map, config.TOMTOM_API_KEY);
+      map.setLayoutProperty('tomtom-traffic-flow', 'visibility', state.visible.traffic ? 'visible' : 'none');
+    }
+    if (!started) {
+      started = true;
+      refreshAll();
+      setInterval(refreshTransport, 10_000);
+      setInterval(refreshAircraft, 10_000);
+      setInterval(refreshWeather, 300_000);
+      setInterval(refreshRadar, 600_000);
+      setInterval(() => { if (!document.hidden) { updateUI(); rebuildLayers(); } }, 5000);
     }
   });
+  updateUI();
 }
 
-init().catch(err => {
-  console.error('[main] Fatal init error:', err);
-  document.body.innerHTML = `
-    <div style="color:#f88;padding:40px;font-family:monospace;background:#0a0a0f;height:100vh">
-      <h2 style="margin-bottom:16px">Auckland Live — Init Error</h2>
-      <pre style="white-space:pre-wrap;color:#faa">${err.message}</pre>
-      <p style="margin-top:20px;color:#607080">
-        Make sure:<br>
-        1. config.local.js exists with your API keys<br>
-        2. proxy is running: <code style="color:#7fd8ff">node proxy.js</code><br>
-        3. Serving with: <code style="color:#7fd8ff">npx serve .</code>
-      </p>
-    </div>`;
+init().catch(() => {
+  document.getElementById('insight-transport-title').textContent = 'Unable to start the live map';
+  document.getElementById('insight-transport-detail').textContent = 'Check local configuration and the API proxy, then reload.';
+  document.getElementById('city-briefing').open = true;
 });

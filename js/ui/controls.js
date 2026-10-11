@@ -22,6 +22,8 @@ export function initBasemapToggle(onBasemapChange) {
   function setActive(basemap) {
     btnStreets.classList.toggle('active', basemap === 'streets');
     btnAerial.classList.toggle('active',  basemap === 'aerial');
+    btnStreets.setAttribute('aria-pressed', String(basemap === 'streets'));
+    btnAerial.setAttribute('aria-pressed', String(basemap === 'aerial'));
   }
 
   btnStreets.addEventListener('click', () => { setActive('streets'); onBasemapChange('streets'); });

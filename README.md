@@ -92,13 +92,13 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 ## What's built
 
-- Live transport dots (blue=bus, orange=train, teal=ferry) with 2-min fading trails
-- Aircraft dots coloured by altitude (orange shades → green on ground)
+- Live transport symbols (blue=transit, orange=inferred rail, teal=inferred ferry) with 2-min fading trails
+- Heading-oriented aircraft symbols coloured by altitude (orange shades → green on ground)
 - **Vehicle follow mode** — click any dot to lock on: map flies to zoom 15 and tracks the vehicle each poll
-  - Tracker HUD slides in at top-centre with full detail (route, speed, bearing/altitude, direction)
+  - Tracker HUD slides in at top-centre with estimated speed, observation age, data quality and technical details
   - On-map callout: two staggered pulsing lock-on rings + glass label tag above the vehicle
   - Click empty map or ✕ to release; auto-releases if vehicle drops off the feed
-  - AT data quality note (ⓘ, transport only) — explains GPS speed spikes and self-reported vehicle types
+  - AT data quality note (ⓘ, transport only) — explains GPS speed estimates and uncertain vehicle modes
 - 24h hourly forecast strip (temperature, conditions, rain probability)
 - Rain radar overlay (RainViewer, refreshes every 10 min, linear-filtered for smooth rendering)
 - Weather HUD: temperature, conditions, wind, humidity
@@ -110,10 +110,63 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 ## Known data quality issues
 
-- **AT speed data**: AT's GTFS-RT feed sometimes reports speed as the raw GPS Doppler value, which can spike to 80–100 m/s (~300 km/h) momentarily, especially as a bus pulls away from a stop. Speeds above 140 km/h are capped and shown as n/a.
-- **AT vehicle type**: Self-reported by the operator — misclassifications are common (buses appearing in the Waitematā Harbour, etc.). Not a bug.
+- **AT speed data**: Reported speed can spike to implausible values. Displayed speeds now use filtered GPS interval estimates instead; see the estimation rules below.
+- **AT vehicle mode**: The current feed parser has no authoritative mode lookup. Recognised rail and ferry route codes are marked as inferred; all other vehicles are labelled Transit.
 
 ## What's not built yet
 
 - Cloudflare Worker + Pages deployment
-- Mobile responsive layout
+- Authoritative route names, modes, destinations and stop predictions
+
+## October 2026 visual and data-quality update
+
+The dashboard now uses a navy night map, readable glass panels, heading-oriented
+symbols, and smooth motion between received observations. Harbour, City centre,
+Airport and Region scenes set a composed camera and relevant layers; the optional
+tour stops when the user interacts with the map. Narrow screens collapse controls
+and the briefing into drawers. Reduced-motion settings disable interpolation and
+camera animation.
+
+The **Auckland now** briefing reports recent transit vehicles in the viewport,
+GPS-estimated movement, airborne/descending aircraft within the feed's coverage,
+and the peak city-centre rain probability over the next six hourly forecast slots.
+It does not infer delays, congestion trends, or departures from position data.
+Feed fetch ages, radar-frame age and individual observation ages are shown;
+stale feeds are identified and old objects become faint.
+
+### Transport speed estimation
+
+Raw GTFS speed readings are retained internally for diagnostics and are not used
+for the displayed speed. `js/utils/transport-quality.js` estimates interval-average
+speed from great-circle displacement and **vehicle observation timestamps**.
+
+- The first recent position has no speed estimate. Repeated/out-of-order timestamps
+  cannot create a new estimate or change the accepted position.
+- Displacement within 12 metres is treated as GPS jitter. A recent stop takes
+  effect immediately; moving estimates use the median of up to three intervals.
+- Estimates require observation intervals of 5–120 seconds and observations no
+  more than 120 seconds old (with 10 seconds of clock-skew tolerance).
+- Plausibility limits are 140 km/h for unknown transit mode, 162 km/h for inferred
+  rail and 90 km/h for inferred ferries. Changes greater than 3.5 m/s² are rejected.
+  These are configurable heuristics in the source, not verified physical limits.
+- A rejected fix holds the last accepted position and makes speed unavailable;
+  the next valid fix can recover against that anchor. Gaps longer than two minutes
+  re-anchor the vehicle and require another position before showing speed.
+
+Displayed speeds are labelled **estimated** (`~`), are not instantaneous speeds,
+and can understate travel around curves because the estimate uses straight-line
+GPS displacement. The 12-metre deadband can understate very slow movement.
+Displayed positions interpolate between received points and can lag the latest
+observation by up to ten seconds. They are not predicted positions or road-snapped
+routes. Unknown vehicle modes are labelled **Transit**, avoiding false bus labels.
+
+The local API proxy binds to `127.0.0.1` and permits only HTTP loopback browser
+origins. Start it with `node proxy.js`; serve the frontend with `npx serve .` as
+before. The UI pauses polling in hidden tabs, resumes on return, prevents overlapping
+requests per feed and times out feed requests after 15 seconds.
+
+Run the speed-filter and motion regression checks with:
+
+```bash
+node --test tests/*.test.js
+```

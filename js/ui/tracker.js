@@ -1,185 +1,150 @@
-// js/ui/tracker.js — Vehicle/aircraft follow mode
-// Centres the map on the tracked entity each poll and shows a glass HUD
-// with the full detail set (same data as the bottom popup).
+import { classifyRoute } from '../utils/transport-quality.js';
+import { escapeHTML, ageLabel } from '../utils/format.js';
 
-let _map         = null;
-let _trackedId   = null;   // vehicle.id or aircraft.icao24
-let _trackedType = null;   // 'transport' | 'aircraft'
-let _marker      = null;   // maplibregl.Marker for the on-map callout
+let map = null;
+let trackedId = null;
+let trackedType = null;
+let marker = null;
+let onStart = () => {};
+let cameraReadyAt = 0;
+let lastPosition = null;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const hud = document.getElementById('tracker-hud');
+const nameEl = document.getElementById('tracker-name');
+const metaEl = document.getElementById('tracker-meta');
+const badgeEl = document.getElementById('tracker-badge');
+const detailEl = document.getElementById('tracker-detail');
+const infoBtn = document.getElementById('tracker-info-btn');
+const notePanel = document.getElementById('tracker-data-note');
 
-const hud        = document.getElementById('tracker-hud');
-const nameEl     = document.getElementById('tracker-name');
-const metaEl     = document.getElementById('tracker-meta');
-const badgeEl    = document.getElementById('tracker-badge');
-const detailEl   = document.getElementById('tracker-detail');
-const closeBtn   = document.getElementById('tracker-close');
-const infoBtn    = document.getElementById('tracker-info-btn');
-const notePanel  = document.getElementById('tracker-data-note');
-
-closeBtn.addEventListener('click', stopTracking);
+document.getElementById('tracker-close').addEventListener('click', stopTracking);
 infoBtn.addEventListener('click', () => {
   const open = notePanel.classList.toggle('open');
+  notePanel.setAttribute('aria-hidden', String(!open));
   infoBtn.classList.toggle('active', open);
+  infoBtn.setAttribute('aria-expanded', String(open));
 });
 
-export function initTracker(map) {
-  _map = map;
+export function initTracker(value, options = {}) {
+  map = value;
+  onStart = options.onStart ?? (() => {});
+  for (const event of ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart']) {
+    map.on(event, e => { if (e.originalEvent) stopTracking(); });
+  }
 }
-
-export function isTracking() {
-  return _trackedId !== null;
-}
+export function isTracking() { return trackedId !== null; }
 
 export function startTracking(entity, type) {
-  _trackedId   = type === 'transport' ? entity.id : entity.icao24;
-  _trackedType = type;
-
-  _map.flyTo({
-    center:   entity.position.slice(0, 2),
-    zoom:     Math.max(_map.getZoom(), 15),
-    duration: 1600,
-  });
-
-  _renderHUD(entity, type);
+  onStart();
+  trackedId = type === 'transport' ? entity.id : entity.icao24;
+  trackedType = type;
+  lastPosition = null;
+  cameraReadyAt = performance.now() + (reducedMotion.matches ? 0 : 1600);
+  map.flyTo({ center: entity.position.slice(0, 2), zoom: Math.max(map.getZoom(), 14.5), duration: reducedMotion.matches ? 0 : 1600 });
+  renderHUD(entity, type);
   hud.classList.add('visible');
-  _placeMarker(entity);
+  hud.inert = false;
+  hud.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('tracking');
+  placeMarker(entity);
 }
 
 export function stopTracking() {
-  _trackedId   = null;
-  _trackedType = null;
+  const wasTracking = trackedId !== null;
+  trackedId = null;
+  trackedType = null;
   hud.classList.remove('visible');
+  hud.inert = true;
+  hud.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('tracking');
   notePanel.classList.remove('open');
+  notePanel.setAttribute('aria-hidden', 'true');
   infoBtn.classList.remove('active');
-  if (_marker) { _marker.remove(); _marker = null; }
+  infoBtn.setAttribute('aria-expanded', 'false');
+  if (marker) { marker.remove(); marker = null; }
+  if (wasTracking) map?.stop();
 }
 
-// Called after each data poll — re-centres map and refreshes HUD values.
+function findEntity(vehicles, aircraft) {
+  return trackedType === 'transport' ? vehicles.find(v => v.id === trackedId) : aircraft.find(a => a.icao24 === trackedId);
+}
+
 export function updateTracker(vehicles, aircraft) {
-  if (!_trackedId) return;
-
-  const entity = _trackedType === 'transport'
-    ? vehicles.find(v => v.id === _trackedId)
-    : aircraft.find(a => a.icao24 === _trackedId);
-
-  if (!entity) {
-    stopTracking();   // entity dropped off the feed
-    return;
-  }
-
-  const pos = entity.position.slice(0, 2);
-  _map.easeTo({ center: pos, duration: 1800 });
-  _renderHUD(entity, _trackedType);
-  if (_marker) { _marker.setLngLat(pos); _updateCalloutLabel(entity, _trackedType); }
+  if (trackedId === null) return;
+  const entity = findEntity(vehicles, aircraft);
+  if (!entity) { stopTracking(); return; }
+  renderHUD(entity, trackedType);
 }
 
-// ── Marker ───────────────────────────────────────────────────────
+// Camera, icon and callout use the same interpolated point, avoiding a marker
+// that jumps ahead to the raw observation while its vehicle is still moving.
+export function syncTrackerPosition(vehicles, aircraft) {
+  if (trackedId === null) return;
+  const entity = findEntity(vehicles, aircraft);
+  if (!entity) return;
+  const pos = entity.position.slice(0, 2);
+  marker?.setLngLat(pos);
+  if (performance.now() < cameraReadyAt) return;
+  if (lastPosition && pos.every((value, i) => value === lastPosition[i])) return;
+  map.jumpTo({ center: pos });
+  lastPosition = pos;
+}
 
-function _placeMarker(entity) {
-  if (_marker) { _marker.remove(); _marker = null; }
-
+function title(entity, type) {
+  return type === 'transport' ? entity.vehicleLabel || (entity.routeLabel ? `Route ${entity.routeLabel}` : 'Transit vehicle') : entity.callsign || entity.icao24;
+}
+function placeMarker(entity) {
+  marker?.remove();
   const el = document.createElement('div');
   el.className = 'track-marker';
-  el.innerHTML = `
-    <div class="track-ring track-ring--1"></div>
-    <div class="track-ring track-ring--2"></div>
-    <div class="track-lock-ring"></div>
-    <div class="track-callout">
-      <div class="track-callout-tag" id="track-callout-label"></div>
-      <div class="track-callout-stem"></div>
-    </div>`;
-
-  _marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-    .setLngLat(entity.position.slice(0, 2))
-    .addTo(_map);
-
-  _updateCalloutLabel(entity, _trackedType);
+  el.innerHTML = '<div class="track-ring track-ring--1"></div><div class="track-ring track-ring--2"></div><div class="track-lock-ring"></div><div class="track-callout"><div class="track-callout-tag"></div><div class="track-callout-stem"></div></div>';
+  el.querySelector('.track-callout-tag').textContent = title(entity, trackedType);
+  marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(entity.position.slice(0, 2)).addTo(map);
 }
-
-function _updateCalloutLabel(entity, type) {
-  const el = document.getElementById('track-callout-label');
-  if (!el) return;
+function row(label, value) {
+  return `<span class="tracker-detail-label">${escapeHTML(label)}</span><span class="tracker-detail-value">${escapeHTML(value)}</span>`;
+}
+function technical(rows) {
+  return `<details class="tracker-technical"><summary>Technical details ⌄</summary><div class="tracker-detail">${rows.join('')}</div></details>`;
+}
+function renderHUD(entity, type) {
+  // Preserve the user's disclosure state across automatic refreshes.
+  const technicalOpen = detailEl.querySelector('details')?.open;
+  nameEl.textContent = title(entity, type);
   if (type === 'transport') {
-    el.textContent = entity.vehicleLabel ||
-      (entity.routeLabel ? `Route ${entity.routeLabel}` : `Vehicle ${entity.vehicleId}`);
+    const fresh = entity.timestamp && Date.now() - entity.timestamp <= 120_000;
+    const speed = fresh && entity.speed !== null ? `~${Math.round(entity.speed * 3.6)} km/h` : 'Unavailable';
+    const mode = classifyRoute(entity.routeId);
+    badgeEl.textContent = mode === 'unknown' ? 'TRANSIT' : `${mode.toUpperCase()}*`;
+    badgeEl.dataset.vtype = mode;
+    metaEl.textContent = fresh && entity.speed !== null ? `${entity.speed <= 1.4 ? 'Stopped / moving slowly' : 'In motion'} · GPS estimate` : fresh ? 'Building a reliable speed estimate' : 'Last known position · stale';
+    infoBtn.hidden = false;
+    detailEl.innerHTML = `<div class="tracker-detail">${[
+      row('Est. speed', speed), row('Observation', ageLabel(entity.timestamp)),
+      row('Quality', fresh ? entity.speedNote : 'Stale observation; speed unavailable'),
+      entity.routeLabel ? row('Route', entity.routeLabel) : '',
+    ].join('')}</div>` + technical([
+      row('Vehicle ID', entity.vehicleId), row('Route ID', entity.routeId || 'Unknown'),
+      row('Trip start', entity.startTime || 'Unknown'),
+      row('Direction ID', entity.directionId ?? 'Unknown'),
+      row('Bearing', `${Math.round(entity.bearing)}°`),
+    ]);
   } else {
-    el.textContent = entity.callsign || entity.icao24;
-  }
-}
-
-// ── Internal ────────────────────────────────────────────────────
-
-const TRAIN_ROUTES = ['EAST', 'WEST', 'SOUTH', 'ONE', 'PUK'];
-
-function _vehicleType(routeId) {
-  if (!routeId) return 'bus';
-  const r = routeId.toUpperCase();
-  if (r.includes('FERRY')) return 'ferry';
-  if (TRAIN_ROUTES.some(t => r.includes(t))) return 'train';
-  return 'bus';
-}
-
-function _row(label, value) {
-  return `<span class="tracker-detail-label">${label}</span>`
-       + `<span class="tracker-detail-value">${value}</span>`;
-}
-
-function _renderHUD(entity, type) {
-  if (type === 'transport') {
-    const speedKmh = entity.speed != null
-      ? `${Math.round(entity.speed * 3.6)} km/h` : 'n/a';
-    const bearing  = entity.bearing != null
-      ? `${Math.round(Number(entity.bearing))}°` : '—';
-    const vtype    = _vehicleType(entity.routeId);
-    const title    = entity.vehicleLabel ||
-      (entity.routeLabel ? `Route ${entity.routeLabel}` : `Vehicle ${entity.vehicleId}`);
-
-    nameEl.textContent    = title;
-    metaEl.textContent    = `${speedKmh} · ${bearing}`;
-    badgeEl.textContent   = vtype.toUpperCase();
-    badgeEl.dataset.vtype = vtype;
-    infoBtn.hidden        = false;
-
-    const rows = [];
-    if (entity.routeLabel)   rows.push(_row('Route',      entity.routeLabel));
-    if (entity.routeId)      rows.push(_row('Route ID',   entity.routeId));
-    if (entity.startTime)    rows.push(_row('Trip start', entity.startTime));
-    if (entity.directionId != null)
-      rows.push(_row('Direction', entity.directionId === 0 ? '→ Outbound' : '← Inbound'));
-    rows.push(_row('Vehicle ID', entity.vehicleId));
-    rows.push(_row('Speed',      speedKmh));
-    rows.push(_row('Bearing',    bearing));
-    detailEl.innerHTML = rows.join('');
-
-  } else {
-    const altM     = Math.round(entity.altitude);
-    const altFt    = Math.round(entity.altitude * 3.281);
-    const speedKts = entity.velocity != null
-      ? `${Math.round(entity.velocity * 1.944)} kts` : 'n/a';
-    const status   = entity.onGround ? 'On ground' : `${altM} m / ${altFt} ft`;
-    const heading  = entity.heading != null ? `${Math.round(entity.heading)}°` : '—';
-    const vertRate = entity.vertRate != null
-      ? (entity.vertRate > 0.5 ? '↑ climbing'
-        : entity.vertRate < -0.5 ? '↓ descending' : '→ level')
-      : 'n/a';
-
-    nameEl.textContent    = entity.callsign || entity.icao24;
-    metaEl.textContent    = entity.onGround
-      ? `On ground · ${heading}`
-      : `${altM} m · ${speedKts} · ${heading}`;
-    badgeEl.textContent   = 'ACFT';
-    infoBtn.hidden        = true;
-    // Collapse the note if it was open from a previous transport selection
-    notePanel.classList.remove('open');
-    infoBtn.classList.remove('active');
+    const altitude = entity.altitude === null ? 'Unavailable' : `${Math.round(entity.altitude).toLocaleString()} m / ${Math.round(entity.altitude * 3.281).toLocaleString()} ft`;
+    const speed = entity.velocity === null ? 'Unavailable' : `${Math.round(entity.velocity * 1.944)} kts`;
+    const vertical = entity.onGround ? 'On ground' : entity.vertRate === null ? 'Vertical rate unavailable' : entity.vertRate > .5 ? 'Climbing' : entity.vertRate < -.5 ? 'Descending' : 'Level flight';
+    metaEl.textContent = `${vertical} · ${speed}`;
+    badgeEl.textContent = 'AIRCRAFT';
     badgeEl.dataset.vtype = 'aircraft';
-
-    detailEl.innerHTML = [
-      _row('ICAO24',   entity.icao24),
-      _row('Altitude', status),
-      _row('Speed',    speedKts),
-      _row('Heading',  heading),
-      _row('Vertical', vertRate),
-    ].join('');
+    infoBtn.hidden = true;
+    notePanel.classList.remove('open');
+    notePanel.setAttribute('aria-hidden', 'true');
+    infoBtn.classList.remove('active');
+    infoBtn.setAttribute('aria-expanded', 'false');
+    detailEl.innerHTML = `<div class="tracker-detail">${[
+      row('Altitude', entity.onGround ? 'On ground' : altitude), row('Ground speed', speed),
+      row('Flight state', vertical), row('Observation', ageLabel(entity.timestamp)),
+    ].join('')}</div>` + technical([row('ICAO24', entity.icao24), row('Heading', `${Math.round(entity.heading)}°`)]);
   }
+  if (technicalOpen) detailEl.querySelector('details').open = true;
 }

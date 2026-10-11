@@ -1,19 +1,10 @@
 // js/layers/transport.js
 import { fetchAT } from '../utils/api-client.js';
+import { classifyRoute } from '../utils/transport-quality.js';
 
 // AT route classification — by routeId prefix
-const TRAIN_ROUTES = ['EAST', 'WEST', 'SOUTH', 'ONE', 'PUK'];
-
-function classifyRoute(routeId) {
-  if (!routeId) return 'bus';
-  const r = routeId.toUpperCase();
-  if (r.includes('FERRY')) return 'ferry';
-  if (TRAIN_ROUTES.some(t => r.includes(t))) return 'train';
-  return 'bus';
-}
-
 const ROUTE_COLOR = {
-  bus:   [30, 120, 255, 210],
+  unknown: [74, 158, 255, 230],
   train: [255, 140, 30, 220],
   ferry: [30, 200, 180, 220],
 };
@@ -38,16 +29,19 @@ export async function fetchTransportData() {
   const vehicles = [];
   for (const entity of entities) {
     const v = entity.vehicle;
-    if (!v?.position?.latitude || !v?.position?.longitude) continue;
+    const lat = Number(v?.position?.latitude);
+    const lon = Number(v?.position?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)
+      || lat < -37.3 || lat > -36.3 || lon < 174.2 || lon > 175.6) continue;
 
     const rawRouteId = v.trip?.route_id ?? v.trip?.routeId ?? '';
     const label      = v.vehicle?.label ?? '';
 
     vehicles.push({
       id:        entity.id,
-      position:  [v.position.longitude, v.position.latitude],
+      position:  [lon, lat],
       bearing:   v.position.bearing ?? 0,
-      speed:     (v.position.speed != null && v.position.speed <= 38.9) ? v.position.speed : null,  // m/s, capped at 140 km/h
+      reportedSpeed: v.position.speed ?? null, // Kept for diagnostics; never shown as verified speed.
       routeId:   rawRouteId,
       routeLabel: routeLabel(rawRouteId),     // display label e.g. "209"
       vehicleLabel: label,                    // e.g. "Korora" for ferries
@@ -83,28 +77,33 @@ export function buildTransportTrailLayer(trails, visible) {
     visible,
     pickable: false,
     widthMinPixels: 1,
-    widthMaxPixels: 3,
+    widthMaxPixels: 2,
     getPath: d => d.path,
     getColor: d => d.color,
-    getWidth: 2,
+    getWidth: 1,
   });
 }
 
+const VEHICLE_ICON = {
+  url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path fill="white" d="M16 3 26 25 16 21 6 25Z"/></svg>')}`,
+  width: 32, height: 32, anchorX: 16, anchorY: 16, mask: true,
+};
+
 export function buildTransportLayer(vehicles, visible) {
-  return new deck.ScatterplotLayer({
+  return new deck.IconLayer({
     id: 'transport-layer',
     data: vehicles,
     visible,
     pickable: true,
-    opacity: 0.9,
-    stroked: true,
-    filled: true,
-    radiusMinPixels: 4,
-    radiusMaxPixels: 10,
+    getIcon: () => VEHICLE_ICON,
+    billboard: false,
     getPosition: d => d.position,
-    getFillColor: d => ROUTE_COLOR[classifyRoute(d.routeId)],
-    getLineColor: [255, 255, 255, 50],
-    lineWidthMinPixels: 1,
-    getRadius: 60,
+    getColor: d => {
+      const color = ROUTE_COLOR[classifyRoute(d.routeId)];
+      return [...color.slice(0, 3), d.positionQuality === 'rejected' || !d.timestamp || Date.now() - d.timestamp > 120_000 ? 80 : color[3]];
+    },
+    getAngle: d => -d.bearing,
+    getSize: 16,
+    sizeUnits: 'pixels',
   });
 }

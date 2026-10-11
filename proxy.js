@@ -10,9 +10,9 @@ const { CONFIG } = await import('./config.local.js');
 const PORT = 3001;
 
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Accept',
+  'Vary': 'Origin',
 };
 
 // --- OpenSky OAuth2 token cache ---
@@ -65,7 +65,7 @@ async function getOpenSkyToken() {
 }
 
 // --- Generic upstream proxy ---
-function proxyRequest(res, targetUrl, extraHeaders = {}) {
+function proxyRequest(res, targetUrl, extraHeaders = {}, corsHeaders = CORS_HEADERS) {
   const parsed = new URL(targetUrl);
   const options = {
     hostname: parsed.hostname,
@@ -80,7 +80,7 @@ function proxyRequest(res, targetUrl, extraHeaders = {}) {
 
   const upstream = https.request(options, (upstreamRes) => {
     res.writeHead(upstreamRes.statusCode, {
-      ...CORS_HEADERS,
+      ...corsHeaders,
       'Content-Type': upstreamRes.headers['content-type'] || 'application/json',
     });
     upstreamRes.pipe(res);
@@ -89,7 +89,7 @@ function proxyRequest(res, targetUrl, extraHeaders = {}) {
   upstream.on('error', (err) => {
     console.error('[proxy] upstream error:', err.message);
     if (!res.headersSent) {
-      res.writeHead(502, CORS_HEADERS);
+      res.writeHead(502, corsHeaders);
     }
     res.end(JSON.stringify({ error: 'Upstream request failed', detail: err.message }));
   });
@@ -99,8 +99,24 @@ function proxyRequest(res, targetUrl, extraHeaders = {}) {
 
 // --- HTTP server ---
 http.createServer(async (req, res) => {
+  // Development credentials are only available to local browser apps. Never
+  // expose this proxy on the LAN or permit arbitrary website origins.
+  const origin = req.headers.origin;
+  let localOrigin = false;
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      localOrigin = url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname);
+    } catch { /* Invalid origins are rejected below. */ }
+    if (!localOrigin) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Local development origins only' }));
+      return;
+    }
+  }
+  const corsHeaders = { ...CORS_HEADERS, ...(localOrigin ? { 'Access-Control-Allow-Origin': origin } : {}) };
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, CORS_HEADERS);
+    res.writeHead(204, corsHeaders);
     res.end();
     return;
   }
@@ -109,7 +125,7 @@ http.createServer(async (req, res) => {
   try {
     parsed = new URL(req.url, `http://localhost:${PORT}`);
   } catch {
-    res.writeHead(400, CORS_HEADERS);
+    res.writeHead(400, corsHeaders);
     res.end(JSON.stringify({ error: 'Bad request URL' }));
     return;
   }
@@ -123,7 +139,7 @@ http.createServer(async (req, res) => {
     console.log(`[proxy] AT → ${upstream}`);
     proxyRequest(res, upstream, {
       'Ocp-Apim-Subscription-Key': CONFIG.AT_API_KEY,
-    });
+    }, corsHeaders);
     return;
   }
 
@@ -136,19 +152,19 @@ http.createServer(async (req, res) => {
       const token = await getOpenSkyToken();
       proxyRequest(res, upstream, {
         'Authorization': `Bearer ${token}`,
-      });
+      }, corsHeaders);
     } catch (err) {
       console.error('[proxy] OpenSky auth error:', err.message);
-      res.writeHead(503, CORS_HEADERS);
+      res.writeHead(503, corsHeaders);
       res.end(JSON.stringify({ error: 'OpenSky auth failed', detail: err.message }));
     }
     return;
   }
 
-  res.writeHead(404, CORS_HEADERS);
+  res.writeHead(404, corsHeaders);
   res.end(JSON.stringify({ error: 'Unknown proxy route', path: pathname }));
 
-}).listen(PORT, () => {
+}).listen(PORT, '127.0.0.1', () => {
   console.log(`[proxy] Listening on http://localhost:${PORT}`);
   console.log('[proxy] Routes:');
   console.log(`  /at/*      → https://api.at.govt.nz/realtime/legacy/*`);

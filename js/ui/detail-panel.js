@@ -7,6 +7,8 @@ panelClose.addEventListener('click', hidePanel);
 
 export function hidePanel() {
   panel.classList.remove('open');
+  panel.inert = true;
+  panel.setAttribute('aria-hidden', 'true');
 }
 
 export function showTransportDetail(vehicle) {
@@ -30,6 +32,8 @@ export function showTransportDetail(vehicle) {
     <div class="detail-title">${title}</div>
     <div class="detail-grid">${rows.join('')}</div>`;
   panel.classList.add('open');
+  panel.inert = false;
+  panel.setAttribute('aria-hidden', 'false');
 }
 
 export function showAircraftDetail(aircraft) {
@@ -52,4 +56,6 @@ export function showAircraftDetail(aircraft) {
       <span class="detail-label">Vertical</span><span>${vertRate}</span>
     </div>`;
   panel.classList.add('open');
+  panel.inert = false;
+  panel.setAttribute('aria-hidden', 'false');
 }

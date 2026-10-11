@@ -1,6 +1,7 @@
 # Local dev config — contains real API keys, never commit
 config.local.js
 API keys.txt
+AK-LIVE API keys.txt
 
 # macOS
 .DS_Store

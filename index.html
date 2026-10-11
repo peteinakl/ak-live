@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css">
   <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
@@ -17,9 +18,21 @@
 </head>
 <body>
   <div id="map"></div>
+  <div class="map-shade" aria-hidden="true"></div>
+
+  <header class="masthead">
+    <a class="wordmark" href="/" aria-label="Auckland Live home">AUCKLAND<span>LIVE</span></a>
+    <span class="masthead-caption">A city in motion</span>
+  </header>
+  <div class="scene-heading">
+    <span class="eyebrow">THE VIEW FROM HERE</span>
+    <h1 id="scene-title">Waitematā Harbour</h1>
+    <div class="scene-subtitle"><span class="live-dot"></span><span id="city-clock">Auckland local time</span></div>
+  </div>
 
   <!-- Weather HUD — top-left -->
   <div id="weather-hud" class="panel hud">
+    <div class="panel-header">CITY WEATHER <span id="weather-age" class="feed-age">Connecting</span></div>
     <div class="hud-current">
       <div id="hud-temp">--°</div>
       <div class="hud-right">
@@ -32,11 +45,12 @@
   </div>
 
   <!-- Layer Controls — top-right -->
-  <div id="controls" class="panel controls-panel">
-    <div class="panel-header">
+  <details id="controls" class="panel controls-panel" open>
+    <summary class="panel-header">
       <span class="live-dot"></span>
-      LAYERS
-    </div>
+      LIVE LAYERS <span class="summary-chevron">⌄</span>
+    </summary>
+    <div class="controls-body">
 
     <div class="control-row">
       <input type="checkbox" id="toggle-transport" checked>
@@ -44,7 +58,7 @@
         <span class="layer-dot" style="background:#1e78ff"></span>
         Transport
       </label>
-      <span id="count-transport" class="count">--</span>
+      <span class="layer-status"><span id="count-transport" class="count">--</span><span id="transport-age" class="feed-age">Connecting</span></span>
     </div>
 
     <div class="control-row">
@@ -53,7 +67,7 @@
         <span class="layer-dot" style="background:#ff8020"></span>
         Flights
       </label>
-      <span id="count-aircraft" class="count">--</span>
+      <span class="layer-status"><span id="count-aircraft" class="count">--</span><span id="aircraft-age" class="feed-age">Connecting</span></span>
     </div>
 
     <div class="control-row">
@@ -65,7 +79,7 @@
     </div>
 
     <div class="control-row">
-      <input type="checkbox" id="toggle-traffic" checked>
+      <input type="checkbox" id="toggle-traffic">
       <label for="toggle-traffic">
         <span class="layer-dot" style="background:#50c840"></span>
         Traffic
@@ -75,13 +89,35 @@
     <div class="control-divider"></div>
 
     <div class="basemap-row">
-      <button id="basemap-streets" class="basemap-btn active">Streets</button>
+      <button id="basemap-streets" class="basemap-btn active" aria-pressed="true">Night</button>
       <button id="basemap-aerial"  class="basemap-btn">Aerial</button>
     </div>
-  </div>
+    <div class="map-legend"><span style="color:#4a9eff">▲ Transit</span><span style="color:#30c8b4">▲ Ferry*</span><span style="color:#ff9040">▲ Rail*</span><span style="color:#ffa040">✈ Flight</span></div>
+    <p class="legend-note">* Mode inferred from route code.<br>Positions smoothed between observations.</p>
+    <div id="radar-age" class="feed-age">Radar connecting</div>
+    </div>
+  </details>
+
+  <details id="city-briefing" class="panel briefing-panel" open>
+    <summary class="panel-header"><span class="live-dot"></span>AUCKLAND NOW <span class="summary-chevron">⌄</span></summary>
+    <div class="briefing-body">
+      <p class="briefing-intro">A closer look at the city.</p>
+      <button id="insight-transport" class="insight" type="button"><span class="insight-icon transit">↗</span><span><strong id="insight-transport-title">Connecting to transport</strong><span id="insight-transport-detail">Waiting for live observations</span></span><span class="insight-arrow">↗</span></button>
+      <button id="insight-aircraft" class="insight" type="button"><span class="insight-icon flights">✈</span><span><strong id="insight-aircraft-title">Watching the skies</strong><span id="insight-aircraft-detail">Waiting for live observations</span></span><span class="insight-arrow">↗</span></button>
+      <button id="insight-weather" class="insight" type="button"><span class="insight-icon rain">☂</span><span><strong id="insight-weather-title">Looking ahead</strong><span id="insight-weather-detail">Waiting for the hourly forecast</span></span><span class="insight-arrow">↗</span></button>
+    </div>
+  </details>
+
+  <nav class="panel scene-nav" aria-label="Explore Auckland">
+    <button class="scene-btn active" data-scene="harbour" aria-pressed="true">Harbour</button>
+    <button class="scene-btn" data-scene="city" aria-pressed="false">City centre</button>
+    <button class="scene-btn" data-scene="airport" aria-pressed="false">Airport</button>
+    <button class="scene-btn" data-scene="region" aria-pressed="false">Region</button>
+    <button id="tour-toggle" class="tour-btn" aria-pressed="false" aria-label="Start Auckland tour">▷</button>
+  </nav>
 
   <!-- Tracker HUD — top-centre, visible in vehicle follow mode -->
-  <div id="tracker-hud" class="tracker-hud">
+  <div id="tracker-hud" class="tracker-hud" aria-hidden="true" inert>
     <div class="tracker-header">
       <div class="tracker-reticle-wrap">
         <div class="tracker-reticle"></div>
@@ -91,27 +127,23 @@
         <div class="tracker-name" id="tracker-name">—</div>
         <div class="tracker-meta" id="tracker-meta">—</div>
       </div>
-      <div class="tracker-badge" id="tracker-badge" data-vtype="bus">BUS</div>
+      <div class="tracker-badge" id="tracker-badge" data-vtype="unknown">TRANSIT</div>
       <button class="tracker-close" id="tracker-close" aria-label="Stop tracking">✕</button>
     </div>
     <div class="tracker-divider"></div>
     <div class="tracker-detail" id="tracker-detail"></div>
-    <div class="tracker-data-note" id="tracker-data-note">
-      <p>Powered by AT's live GTFS feed — the same data behind those optimistic arrival boards.</p>
-      <p><span class="note-label">Speeds</span> are raw GPS readings and can spike to 300+ km/h. Anything above 140 km/h is capped.</p>
-      <p><span class="note-label">Vehicle type</span> is self-reported by the operator and frequently wrong — hence buses in the Waitematā, ferries on the motorway. Not a bug.</p>
+    <div class="tracker-data-note" id="tracker-data-note" aria-hidden="true">
+      <p><span class="note-label">Speed</span> is an interval estimate from recent GPS positions and observation times. Feed speed readings are not used. GPS jitter, implausible movement and acceleration spikes are filtered; uncertain speeds are unavailable.</p>
+      <p><span class="note-label">Mode</span> is inferred only for recognised rail or ferry route codes. Other vehicles are labelled transit because route codes can be ambiguous.</p>
+      <p>Smoothed positions can lag the latest observation by up to 10 seconds.</p>
     </div>
-    <button class="tracker-info-btn" id="tracker-info-btn" aria-label="About this data">i</button>
+    <button class="tracker-info-btn" id="tracker-info-btn" aria-label="About this data" aria-expanded="false" aria-controls="tracker-data-note">i</button>
   </div>
 
-  <!-- Branding — bottom centre -->
-  <div class="brand">
-    <span class="brand-dot"></span>
-    AKL LIVE
-  </div>
+  <div class="view-hint">Drag to explore · Select a vehicle to follow · Esc to release</div>
 
   <!-- Detail panel — slides up from bottom on entity click -->
-  <div id="detail-panel" class="detail-panel">
+  <div id="detail-panel" class="detail-panel" aria-hidden="true" inert>
     <div class="detail-handle"></div>
     <button id="detail-panel-close" aria-label="Close">✕</button>
     <div id="detail-panel-body"></div>

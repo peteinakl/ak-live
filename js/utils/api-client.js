@@ -11,7 +11,7 @@ export async function fetchAT(path) {
     ? `${PROXY_BASE}/at${path}`
     : `/api/at${path}`;
 
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`AT API ${res.status}: ${await res.text().catch(() => '')}`);
   return res.json();
 }
@@ -21,14 +21,14 @@ export async function fetchOpenSky(path) {
     ? `${PROXY_BASE}/opensky${path}`
     : `/api/opensky${path}`;
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`OpenSky API ${res.status}: ${await res.text().catch(() => '')}`);
   return res.json();
 }
 
 export async function fetchWeather(url) {
   // Open-Meteo is keyless — direct call always
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`Weather API ${res.status}`);
   return res.json();
 }

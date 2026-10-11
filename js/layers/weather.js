@@ -99,7 +99,8 @@ export function updateForecastStrip(data) {
 
 export async function fetchRadarInfo() {
   try {
-    const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    const res = await fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) throw new Error('Radar request failed');
     const data = await res.json();
     const frames = data.radar?.past ?? [];
     if (!frames.length) return null;

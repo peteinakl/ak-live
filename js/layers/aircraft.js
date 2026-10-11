@@ -7,7 +7,7 @@ const PLANE_SVG = `data:image/svg+xml,${encodeURIComponent(
   '<path d="M12 1C13 1 14 6 14 11L23 17L23 19L14 16L13 22L16 23L16 25L12 24L8 25L8 23L11 22L10 16L1 19L1 17L10 11C10 6 11 1 12 1Z" fill="white"/>' +
   '</svg>'
 )}`;
-const PLANE_ICON = { url: PLANE_SVG, width: 24, height: 24, anchorX: 12, anchorY: 12 };
+const PLANE_ICON = { url: PLANE_SVG, width: 24, height: 24, anchorX: 12, anchorY: 12, mask: true };
 
 // Bounding box: upper North Island / Hauraki Gulf (catches NZAA approach traffic)
 const BBOX = 'lamin=-37.1&lomin=174.5&lamax=-36.6&lomax=175.1';
@@ -28,11 +28,13 @@ export async function fetchAircraftData() {
       icao24:   s[0],
       callsign: (s[1] ?? '').trim(),
       position: [s[5], s[6]],
-      altitude: s[7] ?? 0,
+      altitude: s[7] ?? null,
       onGround: s[8],
-      velocity: s[9],
+      velocity: s[9] ?? null,
       heading:  s[10] ?? 0,
-      vertRate: s[11],
+      vertRate: s[11] ?? null,
+      timestamp: s[3] ? s[3] * 1000 : null,
+      lastContact: s[4] ? s[4] * 1000 : null,
     });
   }
   return aircraft;
@@ -54,7 +56,9 @@ export function buildAircraftTrailLayer(trails, visible) {
     const [r, g, b] = getColor(last).slice(0, 3);
     const n = history.length - 1;
     for (let i = 0; i < n; i++) {
-      const alpha = Math.round(20 + (i / n) * 170); // 20 (oldest) → 190 (newest)
+      const age = Date.now() - history[i].ts;
+      if (age > 120_000) continue;
+      const alpha = Math.round((1 - age / 120_000) * 150);
       segments.push({ path: [history[i].position, history[i + 1].position], color: [r, g, b, alpha] });
     }
   }
@@ -72,20 +76,17 @@ export function buildAircraftTrailLayer(trails, visible) {
 }
 
 export function buildAircraftLayer(aircraft, visible) {
-  return new deck.ScatterplotLayer({
+  return new deck.IconLayer({
     id: 'aircraft-layer',
     data: aircraft,
     visible,
     pickable: true,
-    opacity: 0.9,
-    stroked: true,
-    filled: true,
-    radiusMinPixels: 3,
-    radiusMaxPixels: 14,
+    getIcon: () => PLANE_ICON,
+    billboard: false,
     getPosition: d => d.position,
-    getFillColor: d => getColor(d),
-    getLineColor: [255, 255, 255, 40],
-    lineWidthMinPixels: 1,
-    getRadius: 60,
+    getColor: d => [...getColor(d).slice(0, 3), !d.timestamp || Date.now() - d.timestamp > 120_000 ? 90 : 245],
+    getAngle: d => -d.heading,
+    getSize: d => d.onGround ? 21 : 29,
+    sizeUnits: 'pixels',
   });
 }
