@@ -1,4 +1,8 @@
 import { ageLabel } from '../utils/format.js';
+import { POLL_MS } from '../utils/api-client.js';
+
+// A feed is stale once it has missed roughly two refreshes.
+const STALE_MS = { transport: POLL_MS.transport * 3, aircraft: POLL_MS.aircraft * 3 };
 
 export function feedStatus(status, now = Date.now(), maxAge = 30_000) {
   if (!status?.updatedAt) return status?.error ? 'Unavailable' : 'Connecting';
@@ -7,7 +11,7 @@ export function feedStatus(status, now = Date.now(), maxAge = 30_000) {
 
 export function updateFreshness(feeds, radarInfo) {
   const now = Date.now();
-  for (const [name, limit] of [['transport', 30_000], ['aircraft', 30_000], ['weather', 600_000]]) {
+  for (const [name, limit] of [['transport', STALE_MS.transport], ['aircraft', STALE_MS.aircraft], ['weather', 600_000]]) {
     const element = document.getElementById(`${name}-age`);
     element.textContent = feedStatus(feeds[name], now, limit);
     element.classList.toggle('stale', Boolean(feeds[name].error || (feeds[name].updatedAt && now - feeds[name].updatedAt > limit)));
@@ -34,7 +38,7 @@ export function updateBriefing({ vehicles, aircraft, weather, feeds }, map) {
   const transit = vehicles.filter(v => fresh(v) && bounds.contains(v.position) && v.positionQuality !== 'rejected');
   const moving = transit.filter(v => v.speed !== null && v.speed > 1.4).length;
   const estimates = transit.filter(v => v.speed !== null).length;
-  if (!feeds.transport.updatedAt || feeds.transport.error || now - feeds.transport.updatedAt > 30_000) {
+  if (!feeds.transport.updatedAt || feeds.transport.error || now - feeds.transport.updatedAt > STALE_MS.transport) {
     setInsight('transport', feeds.transport.updatedAt ? 'Transport feed is stale' : 'Transport is connecting', 'Live activity will appear when observations arrive', true);
   } else {
     setInsight('transport', `${transit.length.toLocaleString()} transit vehicles in view`,
@@ -43,7 +47,7 @@ export function updateBriefing({ vehicles, aircraft, weather, feeds }, map) {
 
   const flying = aircraft.filter(a => fresh(a) && !a.onGround);
   const descending = flying.filter(a => a.vertRate !== null && a.vertRate < -0.5).length;
-  if (!feeds.aircraft.updatedAt || feeds.aircraft.error || now - feeds.aircraft.updatedAt > 30_000) {
+  if (!feeds.aircraft.updatedAt || feeds.aircraft.error || now - feeds.aircraft.updatedAt > STALE_MS.aircraft) {
     setInsight('aircraft', feeds.aircraft.updatedAt ? 'Aircraft feed is stale' : 'Aircraft feed is connecting', 'Waiting for recent aircraft observations', true);
   } else {
     setInsight('aircraft', `${flying.length} aircraft airborne`, `${descending} descending in feed coverage · View the airport`);

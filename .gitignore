@@ -17,3 +17,8 @@ npm-debug.log*
 .idea/
 *.swp
 *.swo
+
+# Cloudflare deploy
+dist/
+.wrangler/
+.dev.vars

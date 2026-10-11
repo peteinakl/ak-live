@@ -1,13 +1,15 @@
 import { loadConfig } from './utils/config.js';
-import { initMap, setLayers, buildStreetsStyle, buildAerialStyle, removeHillshadeLayers, addTrafficLayer, applyNightStyle } from './map-init.js';
+import { initMap, setLayers, buildStreetsStyle, buildAerialStyle, removeHillshadeLayers, addTrafficLayer, trafficTileUrl, applyNightStyle } from './map-init.js';
 import { fetchTransportData, buildTransportLayer, buildTransportTrailLayer } from './layers/transport.js';
 import { fetchAircraftData, buildAircraftLayer, buildAircraftTrailLayer } from './layers/aircraft.js';
 import { fetchWeatherData, updateWeatherHUD, updateForecastStrip, fetchRadarInfo, buildRadarLayer } from './layers/weather.js';
 import { initControls, updateCounts, initBasemapToggle } from './ui/controls.js';
 import { setWeatherHudVisible } from './ui/hud.js';
 import { initTracker, startTracking, stopTracking, updateTracker, syncTrackerPosition } from './ui/tracker.js';
-import { initScenes } from './ui/scenes.js';
+import { initScenes, SCENES, DEFAULT_SCENE } from './ui/scenes.js';
 import { updateBriefing, updateFreshness } from './ui/briefing.js';
+import { initIdle } from './ui/idle.js';
+import { POLL_MS } from './utils/api-client.js';
 import { TransportQuality } from './utils/transport-quality.js';
 import { MotionStore } from './utils/motion.js';
 
@@ -18,14 +20,15 @@ const state = {
   feeds: { transport: {}, aircraft: {}, weather: {}, radar: {} },
 };
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-const vehicleMotion = new MotionStore();
-const aircraftMotion = new MotionStore();
+const vehicleMotion = new MotionStore(POLL_MS.transport);
+const aircraftMotion = new MotionStore(POLL_MS.aircraft);
 const quality = new TransportQuality();
 const pending = new Set();
-let map, overlay, scenes;
+let map, overlay, scenes, idle;
 let frameId = null;
 let staticLayers = [];
-let currentBasemap = 'streets';
+// Aerial (LINZ) is the default: it loads reliably and spares the MapTiler quota.
+let currentBasemap = 'aerial';
 
 function updateTrails(entities, history, key) {
   const seen = new Set();
@@ -83,9 +86,9 @@ function updateUI() {
   updateTracker(state.vehicles, state.aircraft);
 }
 
-// One in-flight request per feed; a hidden tab does not spend API credits.
+// One in-flight request per feed; a hidden or idle tab does not spend API credits.
 async function refresh(name, fetcher, apply) {
-  if (document.hidden || pending.has(name)) return;
+  if (document.hidden || idle?.isPaused() || pending.has(name)) return;
   pending.add(name);
   try {
     const data = await fetcher();
@@ -105,7 +108,8 @@ const refreshTransport = () => refresh('transport', fetchTransportData, data => 
   vehicleMotion.update(state.vehicles, 'id', performance.now(), reducedMotion.matches);
   rebuildLayers();
 });
-const refreshAircraft = () => refresh('aircraft', fetchAircraftData, data => {
+let flightsEnabled = true;
+const refreshAircraft = () => flightsEnabled && refresh('aircraft', fetchAircraftData, data => {
   state.aircraft = data;
   updateTrails(data, state.aircraftTrails, 'icao24');
   aircraftMotion.update(data, 'icao24', performance.now(), reducedMotion.matches);
@@ -134,7 +138,14 @@ function setVisible(name, value) {
 
 async function init() {
   const config = await loadConfig();
-  const result = initMap(config.MAPTILER_KEY, ({ object, layer }) => {
+  // The shared demo has no flights feed (see worker/index.js); hide its UI.
+  if (config.FLIGHTS === false) {
+    flightsEnabled = false;
+    state.visible.aircraft = false;
+    document.querySelectorAll('[data-feature="flights"]').forEach(el => { el.hidden = true; });
+  }
+  const { title: _title, ...initialView } = SCENES[DEFAULT_SCENE];
+  const result = initMap(buildAerialStyle(config.LINZ_API_KEY), initialView, ({ object, layer }) => {
     if (!object) { stopTracking(); return; }
     if (layer.id === 'transport-layer') startTracking(object, 'transport');
     if (layer.id === 'aircraft-layer') startTracking(object, 'aircraft');
@@ -146,8 +157,8 @@ async function init() {
   scenes = initScenes(map, {
     reducedMotion, stopTracking,
     onSelect: id => {
-      setVisible('transport', id !== 'airport');
-      setVisible('aircraft', id !== 'city');
+      setVisible('transport', id !== 'airport' || !flightsEnabled);
+      if (flightsEnabled) setVisible('aircraft', id !== 'city');
       setVisible('traffic', id === 'city' || id === 'region');
     },
   });
@@ -187,21 +198,25 @@ async function init() {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) { vehicleMotion.finish(); aircraftMotion.finish(); refreshAll(); rebuildLayers(); }
   });
+  idle = initIdle({
+    onPause: () => { scenes.stopTour(); map.stop(); },
+    onResume: () => { vehicleMotion.finish(); aircraftMotion.finish(); refreshAll(); rebuildLayers(); },
+  });
   // Recompute viewport activity after a camera move, not on each animation frame.
   map.on('moveend', () => updateBriefing(state, map));
 
   let started = false;
   map.on('style.load', () => {
     if (currentBasemap === 'streets') { removeHillshadeLayers(map); applyNightStyle(map); }
-    if (config.TOMTOM_API_KEY) {
-      addTrafficLayer(map, config.TOMTOM_API_KEY);
+    if (config.TOMTOM_API_KEY || config.TRAFFIC_PROXY) {
+      addTrafficLayer(map, trafficTileUrl(config));
       map.setLayoutProperty('tomtom-traffic-flow', 'visibility', state.visible.traffic ? 'visible' : 'none');
     }
     if (!started) {
       started = true;
       refreshAll();
-      setInterval(refreshTransport, 10_000);
-      setInterval(refreshAircraft, 10_000);
+      setInterval(refreshTransport, POLL_MS.transport);
+      setInterval(refreshAircraft, POLL_MS.aircraft);
       setInterval(refreshWeather, 300_000);
       setInterval(refreshRadar, 600_000);
       setInterval(() => { if (!document.hidden) { updateUI(); rebuildLayers(); } }, 5000);

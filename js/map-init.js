@@ -61,15 +61,12 @@ export function removeHillshadeLayers(map) {
   toRemove.forEach(id => { try { map.removeLayer(id); } catch {} });
 }
 
-export function initMap(maptilerKey, onLayerClick) {
+export function initMap(style, initialView, onLayerClick) {
   const map = new maplibregl.Map({
     container: 'map',
-    style: buildStreetsStyle(maptilerKey),
-    center: [174.773, -36.828],  // [lng, lat] — Waitematā Harbour scene
-    zoom: 12.8,
+    style,
+    ...initialView,  // { center, zoom, pitch, bearing } of the opening scene
     minZoom: 7,
-    pitch: 50,
-    bearing: 145,
     antialias: true,
     // Constrain to NZ North Island — data coverage is Auckland-only
     maxBounds: [172.5, -41.7, 178.6, -34.3],
@@ -92,12 +89,24 @@ export function setLayers(overlay, layers) {
   overlay.setProps({ layers });
 }
 
-export function addTrafficLayer(map, tomtomKey) {
+// Locally tiles come straight from TomTom; the shared demo proxies them through
+// the Worker (key stays server-side). Bounds and maxzoom match the Worker's
+// limits, so MapLibre overzooms past z15 rather than requesting more tiles.
+export function trafficTileUrl(config) {
+  return config.TRAFFIC_PROXY
+    ? `${location.origin}/api/traffic/{z}/{x}/{y}.png`
+    : `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${config.TOMTOM_API_KEY}&tileSize=256`;
+}
+
+export function addTrafficLayer(map, tileUrl) {
   if (!map.getSource('tomtom-traffic')) {
     map.addSource('tomtom-traffic', {
       type: 'raster',
-      tiles: [`https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${tomtomKey}&tileSize=256`],
+      tiles: [tileUrl],
       tileSize: 256,
+      minzoom: 10,
+      maxzoom: 15,
+      bounds: [174.2, -37.5, 175.6, -36.2],
       attribution: '© <a href="https://www.tomtom.com" target="_blank">TomTom</a>',
     });
   }

@@ -6,6 +6,13 @@ const IS_LOCAL =
 
 const PROXY_BASE = 'http://localhost:3001';
 
+// The shared demo's Worker refreshes AT every 20s and OpenSky every 30s, so
+// polling faster in production would only spend Worker request quota.
+export const POLL_MS = {
+  transport: IS_LOCAL ? 10_000 : 20_000,
+  aircraft: IS_LOCAL ? 10_000 : 30_000,
+};
+
 export async function fetchAT(path) {
   const url = IS_LOCAL
     ? `${PROXY_BASE}/at${path}`

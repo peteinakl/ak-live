@@ -29,7 +29,7 @@ export function initBasemapToggle(onBasemapChange) {
   btnStreets.addEventListener('click', () => { setActive('streets'); onBasemapChange('streets'); });
   btnAerial.addEventListener('click',  () => { setActive('aerial');  onBasemapChange('aerial'); });
 
-  setActive('streets');
+  setActive('aerial');
 }
 
 export function updateCounts({ transport, aircraft }) {

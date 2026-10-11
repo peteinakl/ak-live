@@ -65,10 +65,29 @@ proxy.js :3001              ← local dev only
 
 Open-Meteo  → direct from browser (no auth)
 LINZ        → direct from browser (key in tile URL, domain-safe)
-TomTom      → direct from browser (key in tile URL, domain-safe)
+TomTom      → direct from browser locally; via the Worker in production
 ```
 
-The proxy is only needed locally. In production this is replaced by a Cloudflare Worker.
+The proxy is only needed locally. In production a Cloudflare Worker replaces it (see Deploying).
+
+## Deploying (shared demo)
+
+One Cloudflare Worker serves the static site and proxies the keyed APIs. It is built for a shared demo on free-tier quotas: upstream usage stays fixed however many people open the link.
+
+- **AT** goes through one global Durable Object. It refreshes at most every 20s, shares each upstream call across all viewers, and enforces a daily budget (`AT_DAILY_BUDGET` in `wrangler.jsonc`).
+- **Flights are hidden on the shared demo.** OpenSky, adsb.lol and adsb.fi all refuse requests from Cloudflare's network (timeout, 429 and 403 respectively), so the build sets `FLIGHTS: false`. Local dev keeps OpenSky flights through `proxy.js`.
+- **TomTom traffic tiles** are proxied (the key stays server-side), limited to z10–15 over greater Auckland, and capped by `TILE_DAILY_BUDGET`.
+- **The browser** only receives the MapTiler and LINZ keys. Restrict the MapTiler key's allowed origins to the demo URL in the MapTiler dashboard.
+- **Idle pause:** after 5 minutes without interaction, polling stops until the viewer taps to resume.
+
+```bash
+npx wrangler login
+npx wrangler secret put AT_API_KEY
+npx wrangler secret put TOMTOM_API_KEY
+npm run deploy                                # builds dist/ then wrangler deploy
+```
+
+`scripts/build.mjs` copies only `index.html`, `css/` and `js/` into `dist/`, writes a public-keys-only `config.local.js`, and aborts if any server-only secret appears in the bundle. To test the Worker locally, put the two secrets in `.dev.vars` and run `npm run dev:worker`. Open it at `http://[::1]:8787`: `localhost` makes the app use `proxy.js` instead.
 
 ## Stack
 
@@ -115,7 +134,6 @@ The proxy is only needed locally. In production this is replaced by a Cloudflare
 
 ## What's not built yet
 
-- Cloudflare Worker + Pages deployment
 - Authoritative route names, modes, destinations and stop predictions
 
 ## October 2026 visual and data-quality update

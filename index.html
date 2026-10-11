@@ -26,7 +26,7 @@
   </header>
   <div class="scene-heading">
     <span class="eyebrow">THE VIEW FROM HERE</span>
-    <h1 id="scene-title">Waitematā Harbour</h1>
+    <h1 id="scene-title">The heart of Auckland</h1>
     <div class="scene-subtitle"><span class="live-dot"></span><span id="city-clock">Auckland local time</span></div>
   </div>
 
@@ -61,7 +61,7 @@
       <span class="layer-status"><span id="count-transport" class="count">--</span><span id="transport-age" class="feed-age">Connecting</span></span>
     </div>
 
-    <div class="control-row">
+    <div class="control-row" data-feature="flights">
       <input type="checkbox" id="toggle-aircraft" checked>
       <label for="toggle-aircraft">
         <span class="layer-dot" style="background:#ff8020"></span>
@@ -89,10 +89,10 @@
     <div class="control-divider"></div>
 
     <div class="basemap-row">
-      <button id="basemap-streets" class="basemap-btn active" aria-pressed="true">Night</button>
-      <button id="basemap-aerial"  class="basemap-btn">Aerial</button>
+      <button id="basemap-streets" class="basemap-btn" aria-pressed="false">Night</button>
+      <button id="basemap-aerial"  class="basemap-btn active" aria-pressed="true">Aerial</button>
     </div>
-    <div class="map-legend"><span style="color:#4a9eff">▲ Transit</span><span style="color:#30c8b4">▲ Ferry*</span><span style="color:#ff9040">▲ Rail*</span><span style="color:#ffa040">✈ Flight</span></div>
+    <div class="map-legend"><span style="color:#4a9eff">▲ Transit</span><span style="color:#30c8b4">▲ Ferry*</span><span style="color:#ff9040">▲ Rail*</span><span style="color:#ffa040" data-feature="flights">✈ Flight</span></div>
     <p class="legend-note">* Mode inferred from route code.<br>Positions smoothed between observations.</p>
     <div id="radar-age" class="feed-age">Radar connecting</div>
     </div>
@@ -103,14 +103,14 @@
     <div class="briefing-body">
       <p class="briefing-intro">A closer look at the city.</p>
       <button id="insight-transport" class="insight" type="button"><span class="insight-icon transit">↗</span><span><strong id="insight-transport-title">Connecting to transport</strong><span id="insight-transport-detail">Waiting for live observations</span></span><span class="insight-arrow">↗</span></button>
-      <button id="insight-aircraft" class="insight" type="button"><span class="insight-icon flights">✈</span><span><strong id="insight-aircraft-title">Watching the skies</strong><span id="insight-aircraft-detail">Waiting for live observations</span></span><span class="insight-arrow">↗</span></button>
+      <button id="insight-aircraft" class="insight" type="button" data-feature="flights"><span class="insight-icon flights">✈</span><span><strong id="insight-aircraft-title">Watching the skies</strong><span id="insight-aircraft-detail">Waiting for live observations</span></span><span class="insight-arrow">↗</span></button>
       <button id="insight-weather" class="insight" type="button"><span class="insight-icon rain">☂</span><span><strong id="insight-weather-title">Looking ahead</strong><span id="insight-weather-detail">Waiting for the hourly forecast</span></span><span class="insight-arrow">↗</span></button>
     </div>
   </details>
 
   <nav class="panel scene-nav" aria-label="Explore Auckland">
-    <button class="scene-btn active" data-scene="harbour" aria-pressed="true">Harbour</button>
-    <button class="scene-btn" data-scene="city" aria-pressed="false">City centre</button>
+    <button class="scene-btn" data-scene="harbour" aria-pressed="false">Harbour</button>
+    <button class="scene-btn active" data-scene="city" aria-pressed="true">City centre</button>
     <button class="scene-btn" data-scene="airport" aria-pressed="false">Airport</button>
     <button class="scene-btn" data-scene="region" aria-pressed="false">Region</button>
     <button id="tour-toggle" class="tour-btn" aria-pressed="false" aria-label="Start Auckland tour">▷</button>
@@ -135,7 +135,7 @@
     <div class="tracker-data-note" id="tracker-data-note" aria-hidden="true">
       <p><span class="note-label">Speed</span> is an interval estimate from recent GPS positions and observation times. Feed speed readings are not used. GPS jitter, implausible movement and acceleration spikes are filtered; uncertain speeds are unavailable.</p>
       <p><span class="note-label">Mode</span> is inferred only for recognised rail or ferry route codes. Other vehicles are labelled transit because route codes can be ambiguous.</p>
-      <p>Smoothed positions can lag the latest observation by up to 10 seconds.</p>
+      <p>Smoothed positions can lag the latest observation by up to one refresh interval.</p>
     </div>
     <button class="tracker-info-btn" id="tracker-info-btn" aria-label="About this data" aria-expanded="false" aria-controls="tracker-data-note">i</button>
   </div>
@@ -147,6 +147,16 @@
     <div class="detail-handle"></div>
     <button id="detail-panel-close" aria-label="Close">✕</button>
     <div id="detail-panel-body"></div>
+  </div>
+
+  <!-- Idle pause — live feeds stop after 5 min without interaction -->
+  <div id="idle-overlay" class="idle-overlay" hidden>
+    <div class="panel idle-card" role="status">
+      <span class="eyebrow">PAUSED</span>
+      <p class="idle-title">Live feeds paused</p>
+      <p class="idle-detail">Auckland Live pauses after a few quiet minutes to share its limited live data fairly.</p>
+      <button type="button" class="idle-resume">Tap to resume</button>
+    </div>
   </div>
 
   <script type="module" src="js/main.js"></script>

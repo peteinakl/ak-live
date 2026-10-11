@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ak-live",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-01",
+  // Built by scripts/build.mjs from an allowlist — never point this at the repo root.
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "FEED_CACHE", "class_name": "FeedCache" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FeedCache"] }],
+  "observability": { "enabled": true },
+  // Upstream call caps. Worst case per day is min(86400 / TTL, budget).
+  // Secrets (wrangler secret put): AT_API_KEY, TOMTOM_API_KEY
+  "vars": {
+    "AT_TTL_S": 20,
+    "AT_DAILY_BUDGET": 4000,
+    "TILE_DAILY_BUDGET": 20000
+  }
+}

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Auckland Live is a real-time geospatial web dashboard visualizing public transport, aircraft, traffic flow, and weather over Auckland, NZ. Dark ATC/radar aesthetic, WebGL-accelerated rendering, all free-tier APIs.
 
-**Current state (v1.1):** Fully functional local MVP. Cloudflare Worker + Pages deployment not yet done.
+**Current state (v1.2):** Fully functional. Deployable as a shared demo on one Cloudflare Worker (static assets + API proxy) with quota guards.
 
 ## Running Locally
 
@@ -25,18 +25,18 @@ Open `http://localhost:3000`. Config requires `config.local.js` (gitignored — 
 ## Architecture
 
 ### Stack
-- **MapLibre GL JS v4** — basemap renderer. Two modes: MapTiler streets-v2 (vector) or LINZ aerial (raster). Switched via `map.setStyle(..., { diff: false })`.
+- **MapLibre GL JS v4** — basemap renderer. Two modes: LINZ aerial (raster, default) or MapTiler streets-v2 (vector, "Night"). Switched via `map.setStyle(..., { diff: false })`.
 - **deck.gl v9** — `MapboxOverlay` on a separate canvas above MapLibre. Used for transport dots, aircraft dots, trail `PathLayer`s, and rain radar `BitmapLayer`.
 - **TomTom Traffic Flow** — raster tiles added as a MapLibre layer (not deck.gl), re-added in `style.load` after every basemap switch.
-- **Cloudflare Worker** (not yet deployed) — will proxy AT and OpenSky in production.
+- **Cloudflare Worker** (`worker/index.js`) — serves `dist/` as static assets and proxies AT and TomTom tiles in production. No flights in production (see Deploying).
 
 ### Data Layers & Polling
 
 | Layer | Source | Interval | How |
 |-------|--------|----------|-----|
-| Public transport | AT GTFS-RT API | 10s | Via proxy → deck.gl ScatterplotLayer |
-| Aircraft | OpenSky ADS-B | 10s | Via proxy → deck.gl ScatterplotLayer |
-| Traffic flow | TomTom raster tiles | Live | Direct → MapLibre raster layer |
+| Public transport | AT GTFS-RT API | 10s local / 20s prod | Via proxy or Worker → deck.gl ScatterplotLayer |
+| Aircraft | OpenSky ADS-B | 10s (local only) | Via proxy → deck.gl ScatterplotLayer. Hidden in prod |
+| Traffic flow | TomTom raster tiles | Live | Direct locally, via Worker in prod → MapLibre raster layer |
 | Rain radar | RainViewer | 10 min | Direct → deck.gl TileLayer + BitmapLayer |
 | Weather HUD | Open-Meteo | 5 min | Direct → DOM |
 | Aerial imagery | LINZ Basemaps | Static | Direct → MapLibre style |
@@ -66,6 +66,12 @@ Open `http://localhost:3000`. Config requires `config.local.js` (gitignored — 
 ```
 index.html
 proxy.js                   # Local dev proxy (Node ESM, no npm deps)
+wrangler.jsonc             # Worker config: assets=dist/, FeedCache DO, TTL/budget vars
+worker/
+  index.js                 # Production API proxy + FeedCache Durable Object
+  limits.js                # Pure helpers: traffic tile bbox/zoom, budget day, TTL
+scripts/
+  build.mjs                # Allowlist copy → dist/ with public-keys-only config
 package.json               # { "type": "module" } — enables ESM in Node
 config.local.example.js    # Key template
 config.local.js            # gitignored — real keys
@@ -82,6 +88,7 @@ js/
     detail-panel.js        # Slide-in bottom panel (suppressed during follow mode)
     hud.js                 # Weather HUD DOM updates
     tracker.js             # Vehicle follow mode: HUD, map.flyTo/easeTo, MapLibre marker callout
+    idle.js                # Pauses polling + tour after 5 min without input
   utils/
     api-client.js          # Routes AT/OpenSky through proxy on localhost
     config.js              # Dynamic import of config.local.js
@@ -89,16 +96,23 @@ css/
   style.css
 ```
 
-## Deploying (not yet done)
+## Deploying
 
-**Cloudflare Pages** — static frontend, auto-deploys from Git.
+A single Cloudflare **Worker with static assets** (`wrangler.jsonc`). It serves `dist/` and handles `/api/*`:
 
-**Cloudflare Worker** (`worker/` — not yet created):
+- `/api/at/vehiclelocations` → `FeedCache` Durable Object (one global instance per feed name). It makes a single shared upstream fetch per TTL (`AT_TTL_S`=20), with a per-UTC-day upstream budget in DO storage. Failed fetches also wait out the TTL. Client query strings are ignored and upstream URLs are fixed server-side.
+- **No flights feed in production.** OpenSky (auth server times out), adsb.lol (429) and adsb.fi (403) all refuse Cloudflare egress IPs; this was tested live on 2026-10-11. The build sets `FLIGHTS: false`, and `main.js` then hides every `[data-feature="flights"]` element, skips aircraft polling, and keeps transport visible on the Airport scene. Re-enabling flights needs a relay on a non-Cloudflare host or a paid ADS-B API.
+- `/api/traffic/{z}/{x}/{y}.png` → TomTom, only for z10–15 inside the Auckland bbox (`worker/limits.js`). The `tiles` DO instance enforces `TILE_DAILY_BUDGET`; once it is spent, a transparent PNG is returned.
+- The Cache API is a no-op on `workers.dev`, which is why the DO does all the caching.
+
+**Build:** `scripts/build.mjs` uses an allowlist (`index.html`, `css/`, `js/`) → `dist/`, plus a generated `config.local.js` with only `MAPTILER_KEY`, `LINZ_API_KEY`, `TRAFFIC_PROXY: true` and `FLIGHTS: false`. The build fails if a server-only secret appears in `dist/`. Never point `assets.directory` at the repo root.
+
+**Client-side quota guards:** `POLL_MS` in `api-client.js` is 10s locally and 20s in production to match the Worker TTL. `MotionStore` durations and briefing stale thresholds (3× poll) follow it. `js/ui/idle.js` pauses all polling and the scene tour after 5 min without input. The default basemap is LINZ aerial, so MapTiler (100k tiles/month) only loads when someone picks Night.
+
 ```bash
-npx wrangler deploy
-npx wrangler secret put AT_API_KEY
-npx wrangler secret put OPENSKY_CLIENT_ID
-npx wrangler secret put OPENSKY_CLIENT_SECRET
+npx wrangler secret put AT_API_KEY   # + TOMTOM_API_KEY
+npm run deploy                       # build + wrangler deploy
+npm run dev:worker                   # local Worker; needs .dev.vars. Open http://[::1]:8787 (localhost uses proxy.js)
 ```
 
-LINZ, TomTom, and MapTiler keys are safe to embed in client JS (all are domain-restricted or tile-URL-bound).
+Live at https://ak-live.peter-mangin.workers.dev. LINZ and MapTiler keys are public in the browser; restrict MapTiler to the demo origin in its dashboard.

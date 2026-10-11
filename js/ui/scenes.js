@@ -5,9 +5,13 @@ export const SCENES = {
   region: { title: 'The greater Auckland region', center: [174.82, -36.88], zoom: 10, pitch: 15, bearing: 0 },
 };
 
+// Opening view. The initial camera (map-init.js) and the title/button state in
+// index.html must match this scene.
+export const DEFAULT_SCENE = 'city';
+
 export function initScenes(map, { onSelect, stopTracking, reducedMotion }) {
   let timer = null;
-  let current = 'harbour';
+  let current = DEFAULT_SCENE;
   const tour = document.getElementById('tour-toggle');
   const buttons = [...document.querySelectorAll('[data-scene]')];
   const title = document.getElementById('scene-title');
