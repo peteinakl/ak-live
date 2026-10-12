@@ -4,7 +4,7 @@ import { fetchTransportData, buildTransportLayer, buildTransportTrailLayer } fro
 import { fetchAircraftData, buildAircraftLayer, buildAircraftTrailLayer } from './layers/aircraft.js';
 import { fetchWeatherData, updateWeatherHUD, updateForecastStrip, fetchRadarInfo, buildRadarLayer } from './layers/weather.js';
 import { initControls, updateCounts, initBasemapToggle } from './ui/controls.js';
-import { setWeatherHudVisible } from './ui/hud.js';
+import { initWeatherHud } from './ui/hud.js';
 import { initTracker, startTracking, stopTracking, updateTracker, syncTrackerPosition } from './ui/tracker.js';
 import { initScenes, SCENES, DEFAULT_SCENE } from './ui/scenes.js';
 import { updateBriefing, updateFreshness } from './ui/briefing.js';
@@ -24,7 +24,7 @@ const vehicleMotion = new MotionStore(POLL_MS.transport);
 const aircraftMotion = new MotionStore(POLL_MS.aircraft);
 const quality = new TransportQuality();
 const pending = new Set();
-let map, overlay, scenes, idle;
+let map, overlay, scenes, idle, weatherHud;
 let frameId = null;
 let staticLayers = [];
 // Aerial (LINZ) is the default: it loads reliably and spares the MapTiler quota.
@@ -119,6 +119,7 @@ const refreshWeather = () => refresh('weather', fetchWeatherData, data => {
   state.weather = data;
   updateWeatherHUD(data);
   updateForecastStrip(data);
+  weatherHud.dataLoaded();
 });
 const refreshRadar = () => refresh('radar', fetchRadarInfo, data => {
   state.radarInfo = data;
@@ -130,13 +131,14 @@ function setVisible(name, value) {
   state.visible[name] = value;
   const checkbox = document.getElementById(`toggle-${name}`);
   if (checkbox) checkbox.checked = value;
-  if (name === 'weather') setWeatherHudVisible(value);
+  if (name === 'weather') weatherHud.setVisible(value);
   if (name === 'traffic') {
     if (map.getLayer('tomtom-traffic-flow')) map.setLayoutProperty('tomtom-traffic-flow', 'visibility', value ? 'visible' : 'none');
   } else rebuildLayers();
 }
 
 async function init() {
+  weatherHud = initWeatherHud();
   const config = await loadConfig();
   // The shared demo has no flights feed (see worker/index.js); hide its UI.
   if (config.FLIGHTS === false) {

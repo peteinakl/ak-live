@@ -935,6 +935,10 @@ details:not([open]) > summary { margin-bottom: 0; }
 .feed-age { font-size: 9px; letter-spacing: 0; color: var(--muted); text-transform: none; }
 .panel-header .feed-age { margin-left: auto; font-weight: 400; }
 .feed-age.stale { color: #ffd08d; }
+.hud > summary { min-height: 20px; }
+.hud > summary .summary-chevron { margin-left: 0; }
+#weather-summary-temp { margin-left: auto; color: var(--cyan); letter-spacing: 0; white-space: nowrap; }
+.hud[open] #weather-summary-temp, .hud:not([open]) #weather-age { display: none; }
 .basemap-btn { color: #b6ccda; font-size: 10px; padding: 9px 10px; }
 .map-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; font-size: 9px; margin-top: 16px; }
 .legend-note { margin: 12px 0 8px; font: 10px/1.5 'Manrope', sans-serif; color: var(--muted); }
@@ -998,6 +1002,8 @@ details:not([open]) > summary { margin-bottom: 0; }
   .scene-heading { left: 16px; top: 88px; }
   .scene-heading h1 { font-size: 24px; }
   .hud { left: 16px; top: 178px; width: 230px; padding: 14px; }
+  .hud > summary { margin: -14px -14px 12px; padding: 12px 14px; min-height: 44px; }
+  .hud:not([open]) > summary { margin-bottom: -14px; }
   #hud-temp { font-size: 40px; }
   #forecast-strip { margin-top: 8px; padding-top: 7px; }
   .briefing-panel { left: 16px; right: 16px; width: auto; bottom: 90px; padding: 14px; }

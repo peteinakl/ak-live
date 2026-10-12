@@ -31,8 +31,12 @@
   </div>
 
   <!-- Weather HUD — top-left -->
-  <div id="weather-hud" class="panel hud">
-    <div class="panel-header">CITY WEATHER <span id="weather-age" class="feed-age">Connecting</span></div>
+  <details id="weather-hud" class="panel hud" open>
+    <summary class="panel-header">
+      CITY WEATHER <span id="weather-summary-temp">--°</span>
+      <span id="weather-age" class="feed-age">Connecting</span>
+      <span class="summary-chevron" aria-hidden="true">⌄</span>
+    </summary>
     <div class="hud-current">
       <div id="hud-temp">--°</div>
       <div class="hud-right">
@@ -42,7 +46,7 @@
       </div>
     </div>
     <div id="forecast-strip"></div>
-  </div>
+  </details>
 
   <!-- Layer Controls — top-right -->
   <details id="controls" class="panel controls-panel" open>

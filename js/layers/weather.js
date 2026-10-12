@@ -44,6 +44,8 @@ export function updateWeatherHUD(data) {
   const c = data.current;
   document.getElementById('hud-temp').textContent =
     `${Math.round(c.temperature_2m)}°C`;
+  document.getElementById('weather-summary-temp').textContent =
+    `${Math.round(c.temperature_2m)}°C`;
   document.getElementById('hud-desc').textContent =
     WMO_CODES[c.weather_code] ?? `Code ${c.weather_code}`;
   document.getElementById('hud-wind').textContent =
